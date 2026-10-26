@@ -800,7 +800,7 @@ Menu: `admin/services/shadow-vpn` "Shadow" (order 45), pages as tabs (the approv
 |---|---|
 | Overview | status with phase, target, uptime/attempt and message; the main On/Off button; transport switch SSH/Xray and server/profile picker; tunnel check (endpoint, Test, result, latency); summary tiles (routing, own rules, memory); attention banners |
 | SSH | servers (table + modal form, host-key status, "Pin this key", "Forget trusted key"); keys (paste or upload, type/format badges, used-by count, show) |
-| Xray | profiles (add link, import many, search, pin, rename, show link, delete, delete unpinned, unsupported/insecure badges) |
+| Xray | profiles (add link, import many, search, select, pin, rename, show link, delete, delete unpinned, unsupported/insecure badges); the selected profile has the "selected" badge only while the transport is Xray, and Select (which switches the transport) while it is SSH |
 | Routing | mode cards; the two lists (use, refresh, view, count, updated, auto-refresh); rules tabs Domains / IP / Devices (add with validation, enable, delete, import/export JSON compatible with the desktop); device picker from DHCP leases |
 | Log | Shadow, xray and ssh lines, level filter, refresh, download, follow |
 | Settings | tunnel down: kill switch (default) or direct; autostart; UDP over SSH; tunnel DNS; IPv6; redirect LAN DNS to the router; router traffic; log level; about/update command |

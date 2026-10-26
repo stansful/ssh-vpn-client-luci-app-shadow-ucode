@@ -27,18 +27,24 @@ return view.extend({
 	handleReset: null,
 
 	load() {
-		return common.api.profiles();
+		return this.fetch();
+	},
+
+	fetch() {
+		return Promise.all([
+			common.api.profiles(),
+			L.resolveDefault(common.api.status(), {})
+		]).then(data => {
+			this.profiles = data[0].profiles || [];
+			this.st = data[1] || {};
+		});
 	},
 
 	reload() {
-		return common.api.profiles().then(res => {
-			this.profiles = res.profiles || [];
-			this.draw();
-		}).catch(err => common.fail(err));
+		return this.fetch().then(() => this.draw()).catch(err => common.fail(err));
 	},
 
-	render(data) {
-		this.profiles = data.profiles || [];
+	render() {
 		this.search = el('input', { type: 'text', class: 'cbi-input-text',
 			placeholder: _('Search: name, protocol, address, transport'), input: () => this.filter() });
 		this.tableBox = E('div');
@@ -94,6 +100,8 @@ return view.extend({
 		}, [ '★' ]);
 
 		const text = [ p.name, common.protocolName(p.protocol), p.host, p.transport, p.security ].join(' ').toLowerCase();
+		// the selection stays while the transport is SSH; Select is then what puts the profile into use
+		const current = p.selected && this.st.transport == 'xray';
 
 		return el('tr', { class: 'tr', 'data-text': text }, [
 			el('td', { class: 'td', style: 'width:28px' }, [
@@ -109,7 +117,7 @@ return view.extend({
 			]),
 			el('td', { class: 'td' }, flags),
 			el('td', { class: 'td shv-actions' }, [
-				p.selected
+				current
 					? common.badge('ok', _('selected'))
 					: common.button(_('Select'), 'cbi-button-action', () => this.selectProfile(p), { disabled: p.supported ? null : '' }),
 				' ',

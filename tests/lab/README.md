@@ -91,14 +91,14 @@ SKIP_BUILD=1 ./e2e-shadow.sh     # install out/ as it is
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push and pull request on GitHub's `ubuntu-24.04-arm`: job `unit`
+`.github/workflows/ci.yml` runs on every push to a branch other than `master` and every pull request on GitHub's `ubuntu-24.04-arm`: job `unit`
 (`BUILD_ONLY=1 up.sh` with `dl/` cached by firmware version and sha256, `tests/unit/run.sh`, `check_views.mjs`,
 `scripts/build-release.sh`, `out/` as an artifact), job `host-docker` (`install_test.sh`, which also installs
 the latest release published on GitHub with the tree's install.sh, `rpcd-smoke.sh`, `ssh/e2e.sh`) and job `lab`
 (`up.sh`, then `e2e-shadow.sh install stage1 stage2 stage3`; the router's logs and state are an artifact when it
-fails, `lib/collect-logs.sh`). A push to the default branch is tested by `.github/workflows/release.yml`, which runs
-the same workflow (`workflow_call`; ci.yml skips its own run of that push) and builds and publishes a release only
-after it passes.
+fails, `lib/collect-logs.sh`). A push to `master` is tested by `.github/workflows/release.yml`, which runs the same
+workflow (`workflow_call`; `ci.yml` ignores pushes to `master`) and builds and publishes a release only after it
+passes.
 
 ## Credentials (test values only, never reuse)
 

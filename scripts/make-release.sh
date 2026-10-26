@@ -2,11 +2,11 @@
 # Prepares a release: shows the current version (build/VERSION) and the last release tag, asks for the new
 # version (Enter takes the next patch version), checks that it is higher than the current version and every
 # release tag (local ones and origin's), writes build/VERSION and commits only that file as
-# "feat: release - version X.Y.Z". Pushing that commit to the default branch starts .github/workflows/release.yml:
-# the checks, the build and the release X.Y.Z. No tags here: GitHub creates the tag X.Y.Z when the workflow
-# publishes the release (DESIGN.md 11).
+# "feat: release - version X.Y.Z". It never pushes: the release starts when that commit reaches the default
+# branch on GitHub (.github/workflows/release.yml: the checks, the build and the release X.Y.Z). No tags here:
+# GitHub creates the tag X.Y.Z when the workflow publishes the release (DESIGN.md 11).
 #
-#   scripts/make-release.sh [X.Y.Z] [--yes] [--push] [--no-commit]
+#   scripts/make-release.sh [X.Y.Z] [--yes] [--no-commit]
 #
 # Runs from any directory; bash 3.2 (macOS) or 5 (Linux), BSD or GNU tools. Messages are in Russian.
 set -euo pipefail
@@ -19,14 +19,12 @@ ROOT="$(cd "$HERE/.." && pwd -P)"
 usage() {
 	cat <<'EOF'
 Готовит релиз Shadow для OpenWrt: новая версия в build/VERSION и коммит «feat: release - version X.Y.Z».
-Пуш этого коммита в ветку по умолчанию запускает в GitHub Actions проверки, сборку и публикацию релиза X.Y.Z.
+Релиз X.Y.Z выходит, когда этот коммит оказывается в ветке по умолчанию на GitHub.
 
-  scripts/make-release.sh [X.Y.Z] [--yes] [--push] [--no-commit]
+  scripts/make-release.sh [X.Y.Z] [--yes] [--no-commit]
 
   X.Y.Z         новая версия; без неё скрипт покажет текущую и спросит (Enter — следующая патч-версия)
-  -y, --yes     без вопросов: версия — следующая патч-версия (если не указана), коммит без подтверждения,
-                пуш — только с --push
-  --push        запушить коммит в origin, не спрашивая
+  -y, --yes     без вопросов: версия — следующая патч-версия (если не указана), коммит без подтверждения
   --no-commit   только записать build/VERSION, без коммита
   -h, --help    эта справка
 
@@ -59,7 +57,7 @@ trim() {
 	printf '%s' "$s"
 }
 
-new='' have_new='' yes='' push='' commit=1
+new='' have_new='' yes='' commit=1
 while [ $# -gt 0 ]; do
 	case $1 in
 	-h | --help)
@@ -67,7 +65,6 @@ while [ $# -gt 0 ]; do
 		exit 0
 		;;
 	-y | --yes) yes=1 ;;
-	--push) push=1 ;;
 	--no-commit) commit= ;;
 	-*) usage_error "неизвестный параметр $1" ;;
 	*)
@@ -77,7 +74,6 @@ while [ $# -gt 0 ]; do
 	esac
 	shift
 done
-[ -n "$commit" ] || [ -z "$push" ] || usage_error "--push и --no-commit вместе: без коммита пушить нечего"
 
 # --- the repository
 command -v git >/dev/null 2>&1 || die "нужен git."
@@ -105,8 +101,6 @@ fi
 
 has_origin=
 git remote get-url origin >/dev/null 2>&1 && has_origin=1
-[ -n "$has_origin" ] || [ -z "$push" ] ||
-	die "--push: remote origin не настроен. Добавьте его: git remote add origin <url>."
 
 # The default branch: origin's HEAD, else master or main (origin's or local)
 default=
@@ -128,7 +122,7 @@ fi
 if [ -n "$has_origin" ] && git show-ref -q --verify "refs/remotes/origin/$branch"; then
 	behind="$(git rev-list --count "HEAD..refs/remotes/origin/$branch")"
 	[ "$behind" = 0 ] ||
-		warn "ветка $branch отстаёт от origin/$branch на $behind коммит(ов) (по последнему fetch): сначала git pull, иначе пуш отклонят."
+		warn "ветка $branch отстаёт от origin/$branch на $behind коммит(ов) (по последнему fetch): сначала git pull."
 fi
 
 # --- versions
@@ -263,37 +257,3 @@ if [ "$changed" != build/VERSION ] || [ "$(git show HEAD:build/VERSION 2>/dev/nu
 fi
 trap - INT TERM
 say "Коммит $(git rev-parse --short HEAD): $message"
-
-# --- the push
-if [ -z "$has_origin" ]; then
-	say "remote origin не настроен: добавьте его (git remote add origin <url>) и запушьте ветку $branch."
-	exit 0
-fi
-if [ "$branch" = "$default" ]; then
-	say "Пуш в $default запустит релиз в GitHub Actions (.github/workflows/release.yml): проверки, сборку и публикацию $new."
-else
-	say "Ветка $branch — не ветка по умолчанию${default:+ ($default)}: её пуш релиз не запустит."
-fi
-do_push=$push
-if [ -z "$push" ] && [ -z "$yes" ]; then
-	printf 'Запушить %s в origin? [y/N] ' "$branch"
-	IFS= read -r answer || answer=
-	answer="$(trim "$answer")"
-	if yes_answer "$answer"; then do_push=1; fi
-fi
-if [ -z "$do_push" ]; then
-	say "Не запушено. Когда будете готовы: git push origin $branch"
-	exit 0
-fi
-# Only the branch: no tags, whatever push.followTags says
-git push --no-follow-tags origin "refs/heads/$branch:refs/heads/$branch" ||
-	die "пуш не удался. Коммит остался локально; запушьте позже: git push origin $branch"
-say "Запушено в origin/$branch."
-if [ "$branch" = "$default" ]; then
-	# git@github.com:owner/repo.git, https://github.com/owner/repo(.git), ssh://git@github.com/owner/repo
-	repo="$(git remote get-url origin | sed -nE 's#^(git@|ssh://git@|https://)github\.com[:/]([^/]+/[^/]+)$#\2#p')"
-	repo=${repo%.git}
-	if [ -n "$repo" ]; then
-		say "Ход релиза: https://github.com/$repo/actions/workflows/release.yml"
-	fi
-fi

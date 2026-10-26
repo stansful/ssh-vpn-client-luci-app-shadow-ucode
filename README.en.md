@@ -133,8 +133,9 @@ Docker tests outside the lab: `tests/unit/packaging/install_test.sh` (the instal
 app's code: the scripts in `tests/unit/vectors/` and `tests/unit/links/` recompute them from its sources
 (`DESKTOP_SRC`).
 
-**CI** (`.github/workflows/ci.yml`) runs all of it on every push and pull request on GitHub's arm64 runners; a
-push to the default branch is tested by `.github/workflows/release.yml` (the same CI, once).
+**CI** (`.github/workflows/ci.yml`) runs all of it on every pull request and every push to a branch other than
+`master` on GitHub's arm64 runners; a push to `master` is tested by `.github/workflows/release.yml` (the same CI,
+once).
 
 Routers take `install.sh` from the default branch and the packages from the latest release, so the `install.sh` on
 the branch must install the current release: `install_test.sh` in CI installs the real release from GitHub with it,
@@ -145,13 +146,13 @@ format only compatibly: GitHub serves the old `install.sh` from its cache for up
 
 ```bash
 scripts/make-release.sh               # shows the current version, asks for the new one (Enter: next patch), commits
-git push                              # unless the script pushed: a push to the default branch starts the release
+git push                              # a push to the default branch starts the release
 ```
 
 `scripts/make-release.sh` checks that the tree is clean and that the new version X.Y.Z (no "v") is higher than the
 current one and every release tag, writes it to `build/VERSION` and commits only that file as
-`feat: release - version X.Y.Z`; it pushes when you agree or with `--push`. Without questions:
-`scripts/make-release.sh 0.2.0 --yes --push`. It creates no tags. On every push to the default branch
+`feat: release - version X.Y.Z`. Without questions: `scripts/make-release.sh 0.2.0 --yes`. It never pushes and
+creates no tags. On every push to the default branch
 `.github/workflows/release.yml` runs the whole CI (the lab included) and, when the version in `build/VERSION` has no
 release yet, builds the files with `scripts/build-release.sh` and publishes release `X.Y.Z`: the tag `X.Y.Z` on that
 commit, a draft first, the uploads checked, then published as the latest release, which is where the installer

@@ -1,6 +1,6 @@
-# Tests on every push and pull request. A push to the default branch is tested by release.yml instead, which
-# calls this workflow (workflow_call) before it builds and publishes anything: this workflow skips its own run of
-# such a push, so the checks run once per push. The lab jobs run on GitHub's arm64 runners, so the Cudy TR3000's
+# Tests every push to a branch other than master, and every pull request. A push to master does not start this
+# workflow: release.yml calls it (workflow_call) before it builds and publishes anything, so the checks run once per
+# push and no skipped CI run is left behind. The lab jobs run on GitHub's arm64 runners, so the Cudy TR3000's
 # aarch64 OpenWrt rootfs runs natively in Docker (tests/lab/README.md).
 #   lint         actionlint (the workflows), shellcheck and the tests of the release scripts (scripts/,
 #                .github/scripts/)
@@ -13,13 +13,13 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches-ignore: [master]
   pull_request:
   workflow_dispatch:
   workflow_call:
     inputs:
       release:
-        description: Called by release.yml, which runs these checks on every push to the default branch
+        description: Called by release.yml, which runs these checks on every push to master
         type: boolean
         default: false
       publishing:
@@ -42,8 +42,6 @@ defaults:
 
 jobs:
   lint:
-    # a push to the default branch is tested by release.yml (workflow_call), not here as well
-    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -67,8 +65,6 @@ jobs:
         run: tests/unit/release/run.sh
 
   unit:
-    # a push to the default branch is tested by release.yml (workflow_call), not here as well
-    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
@@ -99,8 +95,6 @@ jobs:
           if-no-files-found: error
 
   host-docker:
-    # a push to the default branch is tested by release.yml (workflow_call), not here as well
-    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
@@ -122,8 +116,6 @@ jobs:
         run: tests/unit/ssh/e2e.sh
 
   lab:
-    # a push to the default branch is tested by release.yml (workflow_call), not here as well
-    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     steps:

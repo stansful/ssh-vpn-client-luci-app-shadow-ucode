@@ -133,8 +133,8 @@ tests/lab/down.sh                     # убрать лабораторию
 `tests/unit/luci/rpcd-smoke.sh`, `tests/unit/ssh/e2e.sh`. Векторы для парсера ссылок посчитаны кодом десктопа:
 скрипты в `tests/unit/vectors/` и `tests/unit/links/` пересчитывают их из его исходников (`DESKTOP_SRC`).
 
-**CI** (`.github/workflows/ci.yml`) гоняет всё это на каждый push и pull request на arm64-раннерах GitHub;
-push в ветку по умолчанию проверяет `.github/workflows/release.yml` (тот же CI, один раз).
+**CI** (`.github/workflows/ci.yml`) гоняет всё это на каждый pull request и push в любую ветку, кроме `master`, на
+arm64-раннерах GitHub; push в `master` проверяет `.github/workflows/release.yml` (тот же CI, один раз).
 
 Роутеры берут `install.sh` из ветки по умолчанию, а пакеты — из последнего релиза. Поэтому `install.sh` в ветке
 обязан ставить текущий релиз: `install_test.sh` в CI ставит им настоящий релиз с GitHub, а пока релизов нет,
@@ -145,13 +145,12 @@ push в ветку по умолчанию проверяет `.github/workflows
 
 ```bash
 scripts/make-release.sh               # покажет текущую версию, спросит новую (Enter — следующий патч), закоммитит
-git push                              # если не запушили из скрипта: пуш в ветку по умолчанию запускает релиз
+git push                              # пуш в ветку по умолчанию запускает релиз
 ```
 
 `scripts/make-release.sh` проверяет, что дерево чистое, а новая версия X.Y.Z (без «v») выше текущей и всех
-релизных тегов, пишет её в `build/VERSION` и коммитит только этот файл как `feat: release - version X.Y.Z`;
-пушит по вопросу или с `--push`. Без вопросов: `scripts/make-release.sh 0.2.0 --yes --push`. Теги скрипт не
-ставит. На каждый push в ветку по умолчанию `.github/workflows/release.yml` прогоняет весь CI (с лабораторией) и,
+релизных тегов, пишет её в `build/VERSION` и коммитит только этот файл как `feat: release - version X.Y.Z`.
+Без вопросов: `scripts/make-release.sh 0.2.0 --yes`. Скрипт ничего не пушит и не ставит теги. На каждый push в ветку по умолчанию `.github/workflows/release.yml` прогоняет весь CI (с лабораторией) и,
 если версии из `build/VERSION` ещё нет среди релизов, собирает файлы через `scripts/build-release.sh` и публикует
 релиз `X.Y.Z`: тег `X.Y.Z` на этом коммите, сначала черновик, проверка загрузок, затем публикация как последнего
 релиза — из него установщик и берёт пакеты. Если версия уже выпущена, запуск кончается подсказкой поднять её.

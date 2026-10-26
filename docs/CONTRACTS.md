@@ -372,6 +372,6 @@ Additive fields beyond the table (the views rely on them; no field above is rena
 - All of it runs on any arm64 Docker host (OrbStack on Apple Silicon, a Linux arm64 machine) and in CI
   (`.github/workflows/ci.yml`: job `lint` on `ubuntu-24.04`, jobs `unit`, `host-docker` and `lab` on GitHub's
   `ubuntu-24.04-arm`). On a
-  push to the default branch `.github/workflows/release.yml` runs that workflow (`workflow_call`) instead of
-  `ci.yml` itself, before it builds anything.
+  push to `master` `.github/workflows/release.yml` runs that workflow (`workflow_call`) before it builds anything;
+  `ci.yml` itself ignores pushes to `master`.
 - Every test is deterministic: no assertion races random jitter or a tight timer window.

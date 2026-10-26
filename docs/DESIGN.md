@@ -74,8 +74,8 @@ ssh-vpn-client-luci-app-shadow-ucode/
                                  release/ (the release scripts' tests: bash and git)
     lab/                         Docker lab: up.sh, down.sh, e2e-shadow.sh (Shadow), tests/e2e.sh (research proofs)
   .github/workflows/
-    ci.yml                       every push and pull request: lint, unit, host docker and lab tests (section 12);
-                                 a push to the default branch is left to release.yml
+    ci.yml                       pull requests and pushes to branches other than master: lint, unit, host docker
+                                 and lab tests (section 12); a push to master is left to release.yml
     release.yml                  every push to master: the whole CI (ci.yml), then, for a version with
                                  no release yet, build and publish the release X.Y.Z install.sh downloads (section 11)
   .github/scripts/               release-state.sh (new/retry/released), release-notes.sh
@@ -935,8 +935,8 @@ suggests the next patch version of the higher of the two, and takes a version on
 exists and it is higher than the current version and every tag. It writes `build/VERSION`, shows the diff, asks
 (`--yes` skips the questions, `--no-commit` stops here), commits only that file as `feat: release - version X.Y.Z`
 (a failed or declined commit puts the file back; git hooks run on the commit's own index, so a commit that a hook
-added other files to or changed the version in is undone the same way) and pushes the branch, never tags, when
-asked (default no) or with `--push`. It never creates tags: GitHub creates the tag when the workflow publishes.
+added other files to or changed the version in is undone the same way). It never pushes (the owner pushes by hand)
+and never creates tags: GitHub creates the tag when the workflow publishes.
 
 `.github/workflows/release.yml` runs on every push to `master` (the trigger names it; the gate also requires it to be
 `github.event.repository.default_branch`) and by hand:
@@ -947,14 +947,16 @@ asked (default no) or with `--push`. It never creates tags: GitHub creates the t
    release; it fails for a version that is not X.Y.Z, one not higher than every other release tag on origin, and a
    tag of the version on another commit.
 2. `quality` is the whole CI (`ci.yml` through `workflow_call`, the lab included) on every push to the default
-   branch, released or not, even when the gate failed; `ci.yml` skips its own run of such a push, so the checks run
-   once. It skips `install_test.sh`'s check of the published release only when this run replaces that release.
+   branch, released or not, even when the gate failed; a push to `master` does not start `ci.yml` itself
+   (`branches-ignore: [master]`), so the checks run once and no skipped CI run is left behind. It skips `install_test.sh`'s check of the published release only when this run replaces that release.
 3. `build` (only for `new`/`retry`, after `quality` passed) runs `scripts/build-release.sh` and checks that the
    output is exactly the five assets and matches `SHA256SUMS`.
 4. `publish` (the only job with `contents: write`) checks the state again (a re-run may come days later), refuses
    when `.github/workflows` changed on the default branch after this commit (`GITHUB_TOKEN` cannot create a tag
-   there; the newer run releases), deletes leftover drafts, creates the release `X.Y.Z` as a draft with the five
-   assets targeting the built commit, checks every upload's size, state and sha256 digest, publishes it with
+   there; the newer run releases), deletes leftover drafts, creates the release `X.Y.Z` as a draft targeting the
+   built commit through the API and keeps the id that call returns (the release list lags behind a draft created a
+   moment ago, so the job never looks it up there), uploads the five assets to that id, checks every upload's size,
+   state and sha256 digest (polling the draft for a few seconds), publishes it with
    `make_latest=true` and checks that `/releases/latest` is this version and the tag is on this commit. A draft is
    deleted when the job fails before publishing. Notes (`.github/scripts/release-notes.sh`), Russian first and then
    English: the install command and the commit subjects since the previous release tag in this commit's history,
@@ -1004,9 +1006,8 @@ hardening for later.
   tunnelling without a restart; port forward works in full mode and with a device rule; one IP in both proxy and
   direct sets goes to the tunnel; profile switch restarts xray; a rejected dnsmasq file rolls back; LAN Pi-hole
   upstream does not loop; QUIC reject in SSH mode and with Vision; LuCI pages smoke.
-- **CI** (`.github/workflows/ci.yml`, every push and pull request, `ubuntu-24.04-arm`; a push to the default branch
-  is tested by `release.yml`, which calls it through `workflow_call`, and `ci.yml` skips its own run of that push,
-  11): `lint` (`ubuntu-24.04`) runs actionlint over the workflows (with shellcheck over their `run:` scripts), shellcheck `-x` over
+- **CI** (`.github/workflows/ci.yml`, every push to a branch other than `master` and every pull request,
+  `ubuntu-24.04-arm`; a push to `master` is tested by `release.yml`, which calls it through `workflow_call`, 11): `lint` (`ubuntu-24.04`) runs actionlint over the workflows (with shellcheck over their `run:` scripts), shellcheck `-x` over
   `scripts/`, `.github/scripts/` and `tests/unit/release/` (the pinned actionlint image's shellcheck 0.11.0, `-f gcc`:
   that static build cannot print Cyrillic source lines) and `tests/unit/release/run.sh`; `unit` builds the lab
   images (`tests/lab/dl` cached by firmware version and sha256), runs `tests/unit/run.sh`, `check_views.mjs` and
@@ -1020,7 +1021,7 @@ hardening for later.
 - **Release scripts** (`tests/unit/release/run.sh`; bash 3.2+ and git on the host, no Docker; `TEST_BASH=<bash>`
   picks the bash): `make-release_test.sh` runs `scripts/make-release.sh` from outside throwaway clones of a local
   bare origin (the prompt and Enter, refused versions and tags, local/origin/legacy tags, a dirty tree, the commit
-  and its single file, pre-commit hooks that stage other files or fail, `--push` without tags, other branches,
+  and its single file, pre-commit hooks that stage other files or fail, no push and no tags, other branches,
   detached HEAD, a branch behind origin, no origin); `release-state_test.sh` runs `release-state.sh` against a bare
   origin with tags and a curl stub for the GitHub API, and `tag_commit` (lightweight and annotated tags);
   `release-notes_test.sh` the notes' previous tag and commit list; `assets_test.sh` checks that release.yml,
@@ -1214,7 +1215,7 @@ release commit made automatically):
 
 | Finding | Change |
 |---|---|
-| a release needed a hand-edited `build/VERSION` and a hand-pushed `vX.Y.Z` tag; nothing checked that the version went up | `scripts/make-release.sh`: shows the current version and the last tag, suggests the next patch, refuses a version that is not X.Y.Z or not higher than the current one and every local or origin tag, commits only `build/VERSION` as `feat: release - version X.Y.Z`, pushes on request; no tags (11) |
+| a release needed a hand-edited `build/VERSION` and a hand-pushed `vX.Y.Z` tag; nothing checked that the version went up | `scripts/make-release.sh`: shows the current version and the last tag, suggests the next patch, refuses a version that is not X.Y.Z or not higher than the current one and every local or origin tag, commits only `build/VERSION` as `feat: release - version X.Y.Z`; no push (by hand), no tags (11) |
 | the release build lived in the workflow, so a local build could differ from the release | `scripts/build-release.sh`: the same build for a developer, CI's `unit` job and release.yml; `SHA256SUMS` also covers `install.sh`; same commit, same sums on macOS, Linux and CI (11) |
 | release.yml started from a tag push, unlike the desktop app | the desktop model: every push to the default branch runs the whole CI, and a version without a release is built and published as `X.Y.Z` (plain tag on the built commit, draft first, uploads checked, latest); a released version ends with a notice to bump it; gate in `release-state.sh` (new/retry/released, not higher than a tag, tag elsewhere) (11) |
 | with release.yml calling ci.yml on every default-branch push, that push would run the whole CI and the lab twice | every ci.yml job skips a push to the default branch unless release.yml called it (`inputs.release`); `publishing` alone decides the published-release check (11, 12) |
@@ -1222,3 +1223,6 @@ release commit made automatically):
 | shellcheck through actionlint covers only `run:` blocks | `lint` job: shellcheck `-x -f gcc` over the release scripts and their tests, then `tests/unit/release/run.sh` (12) |
 | shellcheck of the pinned actionlint image crashed ("commitBuffer: invalid argument") when a finding's source line has Cyrillic, whatever the locale | `-f gcc`, which prints no source lines (12) |
 | nothing kept release.yml's asset list, build-release.sh and the files install.sh downloads in step | `tests/unit/release/assets_test.sh` (12) |
+| the first real release failed: publish looked its new draft up in the release list a second after creating it, and the list did not have it yet ("Expected exactly one draft") | the draft is created through `POST /releases`, whose id the job keeps; assets go to `uploads.github.com` for that id; the asset check polls the draft by id; the release list only serves the clean-up of old drafts (11) |
+| a push to master started ci.yml as well as release.yml: a second, fully skipped CI run | `ci.yml` has `branches-ignore: [master]` and no per-job skip conditions; `release.yml` runs on `master` (11, 12) |
+| make-release.sh asked to push and had `--push` | the push is gone: the script commits, the owner pushes (11) |

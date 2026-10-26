@@ -52,7 +52,7 @@ case " $summed " in
 *) nok "SHA256SUMS covers install.sh too" "SUMMED='$summed'" ;;
 esac
 
-if grep -q 'gh release create "\$VERSION" ' "$RELEASE" && ! grep -Eq '"v\$VERSION"|tag="v|tags: \["v' "$RELEASE"; then
+if grep -qF -- '-f tag_name="$VERSION"' "$RELEASE" && ! grep -Eq '"v\$VERSION"|tag="v|tag_name="v|tags: \["v' "$RELEASE"; then
 	ok "the release and its tag are the plain version X.Y.Z"
 else
 	nok "the release and its tag are the plain version X.Y.Z" "release.yml creates or reads a vX.Y.Z tag"
@@ -82,12 +82,21 @@ else
 	nok "release.yml runs the whole CI (ci.yml) before it builds" "no workflow_call of ci.yml"
 fi
 
-jobs="$(awk '/^jobs:/ { in_jobs = 1; next } in_jobs && /^  [a-z][a-z-]*:$/ { n++ } END { print n + 0 }' "$CI")"
-skips="$(grep -c "^    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)$" "$CI")"
-if [ "$jobs" -gt 0 ] && [ "$jobs" = "$skips" ]; then
-	ok "every ci.yml job leaves a push to the default branch to release.yml ($jobs jobs)"
+# The release list lags behind a draft created a moment ago (a published run failed on it): the publish job takes
+# the draft's id from the create call and never looks the draft up in that list
+if grep -qF 'id=$(gh api -X POST "repos/$GH_REPO/releases"' "$RELEASE" && grep -qF -- '-F draft=true --jq .id)' "$RELEASE" &&
+	! grep -Eq 'gh release (create|upload)|^ *id=\$\(gh api --paginate' "$RELEASE"; then
+	ok "publish works with the id the API returns for the new draft, not a lookup in the release list"
 else
-	nok "every ci.yml job leaves a push to the default branch to release.yml" "$jobs jobs, $skips with the condition"
+	nok "publish works with the id the API returns for the new draft" "release.yml creates or finds the draft another way"
+fi
+
+# A push to master starts release.yml only (which calls ci.yml): no second, skipped CI run for the same push
+if grep -q '^    branches: \[master\]$' "$RELEASE" && grep -q '^    branches-ignore: \[master\]$' "$CI" &&
+	! grep -q 'if: inputs.release ||' "$CI"; then
+	ok "a push to master runs release.yml, ci.yml runs for the other branches and pull requests"
+else
+	nok "a push to master runs release.yml only" "release.yml must trigger on master, ci.yml must ignore master"
 fi
 
 echo "# $pass passed, $fail failed"

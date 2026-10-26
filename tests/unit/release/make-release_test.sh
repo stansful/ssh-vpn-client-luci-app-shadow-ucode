@@ -99,12 +99,11 @@ mr '\n\n\n'
 check "prints the current version" 'has "Текущая версия (build/VERSION): 0.1.0"'
 check "prints the last release tag" 'has "Последний релизный тег:         0.1.0"'
 check "suggests the next patch version" 'has "Новая версия [0.1.1]: "'
-check "Enter takes 0.1.1, Enter commits, Enter does not push (run from outside the repository)" '[ $RC = 0 ] && [ "$(ver)" = 0.1.1 ]'
+check "Enter takes 0.1.1, Enter commits (run from outside the repository)" '[ $RC = 0 ] && [ "$(ver)" = 0.1.1 ]'
 check "...exactly one new commit, on the old HEAD" '[ "$(count)" = $((before + 1)) ] && [ "$(g rev-parse HEAD^)" = "$head" ]'
 check "...named 'feat: release - version 0.1.1'" '[ "$(subject)" = "feat: release - version 0.1.1" ]'
 check "...with build/VERSION only" '[ "$(head_files)" = "build/VERSION " ] && clean'
-check "...says that a push to master starts the release" 'has "Пуш в master запустит релиз"'
-check "...not pushed, no tag" '[ "$(origin_ref master)" = "$origin" ] && [ "$(all_tags)" = "$tags" ] && has "git push origin master"'
+check "...never pushes and never asks to: origin and tags untouched" '[ "$(origin_ref master)" = "$origin" ] && [ "$(all_tags)" = "$tags" ] && ! has "Запуш" && ! has "запуш" && ! has "git push"'
 
 # --- the prompt asks again after a refused version
 new_case reask
@@ -154,7 +153,7 @@ mr ''
 check "the last tag and the suggestion come from all tags" 'has "Последний релизный тег:         v0.8.0" && has "Новая версия [0.8.1]: " && [ $RC = 1 ]'
 mr '' --yes
 check "--yes takes the suggested 0.8.1 and commits without a question" '[ $RC = 0 ] && [ "$(ver)" = 0.8.1 ] && [ "$(subject)" = "feat: release - version 0.8.1" ] && [ "$(count)" = $((before + 1)) ]'
-check "--yes without --push does not push" '[ "$(origin_ref master)" = "$origin" ] && ! has "Запушить"'
+check "--yes does not push" '[ "$(origin_ref master)" = "$origin" ] && ! has "Запуш"'
 
 # --- a dirty tree
 new_case dirty
@@ -182,8 +181,8 @@ no_verify="git commit --no-verify -m 'feat: release - version 0.1.1' -- build/VE
 new_case hooknew
 hook 'echo x >>other && git add other'
 head=$(g rev-parse HEAD) origin=$(origin_ref master)
-mr '' 0.1.1 --yes --push
-check "a hook that stages a new file: the release commit is undone, nothing is pushed" '[ $RC = 1 ] && has "хук git (pre-commit или другой) изменил релизный коммит" && [ "$(g rev-parse HEAD)" = "$head" ] && [ "$(origin_ref master)" = "$origin" ] && ! has "Запушено"'
+mr '' 0.1.1 --yes
+check "a hook that stages a new file: the release commit is undone" '[ $RC = 1 ] && has "хук git (pre-commit или другой) изменил релизный коммит" && [ "$(g rev-parse HEAD)" = "$head" ] && [ "$(origin_ref master)" = "$origin" ]'
 check "...it names the files the commit had and how to commit past the hook" 'has "  build/VERSION" && has "  other" && has "$no_verify"'
 check "...build/VERSION is back in the tree and the index, the hook's file is left untracked" '[ "$(ver)" = 0.1.0 ] && [ "$(g status --porcelain)" = "?? other" ]'
 new_case hooktracked
@@ -207,15 +206,13 @@ before=$(count)
 mr '' 0.1.1 --yes
 check "a hook that stages only build/VERSION (a formatter) keeps the release commit" '[ $RC = 0 ] && [ "$(count)" = $((before + 1)) ] && [ "$(subject)" = "feat: release - version 0.1.1" ] && [ "$(head_files)" = "build/VERSION " ] && clean'
 
-# --- --push
-new_case push
-tags=$(all_tags)
-mr '' 0.1.1 --yes --push
-check "--push pushes the commit to origin" '[ $RC = 0 ] && [ "$(origin_ref master)" = "$(g rev-parse HEAD)" ] && [ "$(subject)" = "feat: release - version 0.1.1" ] && has "Запушено в origin/master"'
-check "...and creates no tag, here or on origin" '[ "$(all_tags)" = "$tags" ]'
-new_case pushask
+# --- no push, ever
+new_case nopush
+origin=$(origin_ref master) tags=$(all_tags)
 mr '\n\nд\n'
-check "the push question: yes pushes" '[ $RC = 0 ] && has "Запушить master в origin? [y/N]" && [ "$(origin_ref master)" = "$(g rev-parse HEAD)" ]'
+check "the commit stays local: no push question, origin and tags untouched" '[ $RC = 0 ] && [ "$(subject)" = "feat: release - version 0.1.1" ] && [ "$(origin_ref master)" = "$origin" ] && [ "$(all_tags)" = "$tags" ] && ! has "Запуш"'
+mr '' 0.1.2 --push
+check "--push is not an option" '[ $RC = 2 ] && has "неизвестный параметр --push"'
 
 # --- the confirmation, --no-commit, options
 new_case decline
@@ -229,22 +226,19 @@ before=$(count)
 mr '' 0.1.1 --no-commit
 check "--no-commit writes build/VERSION and commits nothing" '[ $RC = 0 ] && [ "$(ver)" = 0.1.1 ] && [ "$(count)" = "$before" ] && [ "$(g status --porcelain)" = " M build/VERSION" ] && has "--no-commit"'
 check "...and shows the diff" 'has "+0.1.1" && has "-0.1.0"'
-mr '' 0.1.1 --no-commit --push
-check "--push with --no-commit is a usage error" '[ $RC = 2 ]'
 mr '' --bogus
 check "an unknown option is a usage error" '[ $RC = 2 ] && has "неизвестный параметр --bogus"'
 mr '' 0.1.1 0.1.2
 check "two versions are a usage error" '[ $RC = 2 ]'
 mr '' --help
-check "--help prints the usage" '[ $RC = 0 ] && has "scripts/make-release.sh [X.Y.Z] [--yes] [--push] [--no-commit]"'
+check "--help prints the usage" '[ $RC = 0 ] && has "scripts/make-release.sh [X.Y.Z] [--yes] [--no-commit]"'
 
 # --- branches
 new_case branch
 g checkout -q -b feature
 origin=$(origin_ref master)
-mr '' 0.1.1 --yes --push
-check "another branch: a warning, then commit and push of that branch" '[ $RC = 0 ] && has "вы на ветке feature, а релиз выходит из ветки по умолчанию master" && [ "$(origin_ref feature)" = "$(g rev-parse HEAD)" ] && [ "$(origin_ref master)" = "$origin" ]'
-check "...says that this push does not release" 'has "Ветка feature — не ветка по умолчанию (master): её пуш релиз не запустит."'
+mr '' 0.1.1 --yes
+check "another branch: a warning, then the commit on that branch" '[ $RC = 0 ] && has "вы на ветке feature, а релиз выходит из ветки по умолчанию master" && [ "$(g symbolic-ref --short HEAD)" = feature ] && [ "$(subject)" = "feat: release - version 0.1.1" ] && [ "$(origin_ref master)" = "$origin" ]'
 new_case detached
 g checkout -q --detach
 mr '' 0.1.1 --yes
@@ -256,17 +250,15 @@ git -C "$CASE/other" commit -q -am 'fix: other'
 git -C "$CASE/other" push -q origin master
 g fetch -q origin
 origin=$(origin_ref master)
-mr '' 0.1.1 --yes --push
-check "a branch behind origin: a warning, and the rejected push is reported" '[ $RC = 1 ] && has "ветка master отстаёт от origin/master на 1" && has "пуш не удался. Коммит остался локально" && [ "$(origin_ref master)" = "$origin" ] && [ "$(subject)" = "feat: release - version 0.1.1" ]'
+mr '' 0.1.1 --yes
+check "a branch behind origin: a warning to pull first, the commit is still made locally" '[ $RC = 0 ] && has "ветка master отстаёт от origin/master на 1" && has "сначала git pull" && [ "$(origin_ref master)" = "$origin" ] && [ "$(subject)" = "feat: release - version 0.1.1" ]'
 
 # --- no origin, no repository, the current version
 new_case noorigin
 g remote remove origin
 before=$(count)
-mr '' 0.1.1 --yes --push
-check "--push without origin is refused before anything changes" '[ $RC = 1 ] && has "remote origin не настроен" && [ "$(ver)" = 0.1.0 ] && [ "$(count)" = "$before" ]'
 mr '' --yes
-check "without origin: local tags count, the commit is made, the push is left to the user" '[ $RC = 0 ] && [ "$(ver)" = 0.1.1 ] && [ "$(count)" = $((before + 1)) ] && has "remote origin не настроен: добавьте его"'
+check "without origin: local tags count, the commit is made" '[ $RC = 0 ] && [ "$(ver)" = 0.1.1 ] && [ "$(count)" = $((before + 1)) ]'
 new_case ahead
 echo 0.3.0 >"$REPO/build/VERSION"
 g commit -q -am 'feat: release - version 0.3.0'

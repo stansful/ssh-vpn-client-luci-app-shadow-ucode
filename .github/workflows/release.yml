@@ -71,8 +71,8 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
 
-  # Every push to the default branch, released or not, gets the whole CI here (ci.yml skips its own run of such
-  # a push). It runs even when the gate refused the version, so the push is still tested.
+  # Every push to master, released or not, gets the whole CI here (ci.yml itself ignores pushes to master). It
+  # runs even when the gate refused the version, so the push is still tested.
   quality:
     needs: gate
     if: ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
@@ -183,30 +183,38 @@ jobs:
             assets+=("release/$f")
           done
 
-          # Drafts have no tag yet. Any draft of this version is a leftover of a killed run, or this run's own
-          # one if it fails before publishing.
-          delete_drafts() {
-            gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | select(.draft and .tag_name == env.VERSION) | .id' \
-              | while read -r id; do gh api -X DELETE "repos/$GH_REPO/releases/$id" --silent; done
-          }
-          delete_drafts
-          trap '[ -n "${published:-}" ] || delete_drafts' EXIT
+          # Drafts have no tag yet: any draft of this version is a leftover of a killed run. The release list
+          # lags behind (a draft created a second ago is often missing from it), so it only serves this clean-up.
+          gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | select(.draft and .tag_name == env.VERSION) | .id' \
+            | while read -r old; do gh api -X DELETE "repos/$GH_REPO/releases/$old" --silent; done
 
           # Draft first: install.sh only sees the release once every asset is uploaded and checked. GitHub
-          # creates the lightweight tag on publish.
-          gh release create "$VERSION" "${assets[@]}" --draft \
-            --target "$GITHUB_SHA" \
-            --title "Shadow $VERSION для OpenWrt / for OpenWrt" \
-            --notes-file "$RUNNER_TEMP/notes.md"
-
-          id=$(gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | select(.draft and .tag_name == env.VERSION) | .id')
-          if [ -z "$id" ] || [ "$(wc -l <<<"$id")" -ne 1 ]; then
-            echo "::error::Expected exactly one draft for $VERSION, got: $id"
+          # creates the lightweight tag on publish. The API returns the draft's id at once, and everything below
+          # works with that id, never with a lookup in the release list.
+          id=$(gh api -X POST "repos/$GH_REPO/releases" \
+            -f tag_name="$VERSION" -f target_commitish="$GITHUB_SHA" \
+            -f name="Shadow $VERSION для OpenWrt / for OpenWrt" -F body=@"$RUNNER_TEMP/notes.md" \
+            -F draft=true --jq .id)
+          if ! [[ $id =~ ^[0-9]+$ ]]; then
+            echo "::error::Creating the draft for $VERSION returned no release id: $id"
             exit 1
           fi
+          trap '[ -n "${published:-}" ] || gh api -X DELETE "repos/$GH_REPO/releases/$id" --silent || true' EXIT
 
-          gh api "repos/$GH_REPO/releases/$id" \
-            --jq '.assets[] | "\(.name) \(.size) \(.state) \(.digest // "-")"' > "$RUNNER_TEMP/uploaded.txt"
+          for f in "${assets[@]}"; do
+            curl -fsS -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/octet-stream" --data-binary "@$f" \
+              "https://uploads.github.com/repos/$GH_REPO/releases/$id/assets?name=$(basename "$f")" > /dev/null
+          done
+
+          # The draft by id; its asset list may also lag a moment behind the uploads
+          for _ in 1 2 3 4 5 6; do
+            gh api "repos/$GH_REPO/releases/$id" \
+              --jq '.assets[] | "\(.name) \(.size) \(.state) \(.digest // "-")"' > "$RUNNER_TEMP/uploaded.txt"
+            [ "$(wc -l < "$RUNNER_TEMP/uploaded.txt")" -ne "${#assets[@]}" ] || break
+            sleep 5
+          done
           if [ "$(wc -l < "$RUNNER_TEMP/uploaded.txt")" -ne "${#assets[@]}" ]; then
             echo "::error::The draft has $(wc -l < "$RUNNER_TEMP/uploaded.txt") assets instead of ${#assets[@]}."
             exit 1

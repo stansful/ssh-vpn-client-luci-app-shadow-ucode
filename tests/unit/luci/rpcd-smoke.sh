@@ -98,6 +98,12 @@ expect status '' '@.phase' 'returns a phase'
 expect status '' '@.memory.total_kb' 'reports memory'
 expect status '' '@.versions.xray' 'reports the xray version'
 
+# A first run with Xray only: the first usable profile takes the transport, as SSH has no server yet (DESIGN §10)
+req=$(ucode -e 'print(sprintf("%J", { text: split(require("fs").readfile("/tmp/lab/links.txt"), "\n")[0], source: "manual" }))')
+out=$(call profiles_import "$req")
+[ "$(uci -q get shadow-vpn.main.transport)" = xray ] && pass 'profiles_import: the first usable profile switches the transport to Xray' ||
+	fail 'profiles_import: the first usable profile switches the transport to Xray' "$out"
+
 # Servers and host keys
 sid=$(call server_save '{"values":{"name":"Lab","host":"203.0.113.20","port":"22","username":"vpnuser","auth":"password","keepalive":"15"},"password":"lab-pw"}' | jsonfilter -e '@.sid')
 [ -n "$sid" ] && pass "server_save creates $sid" || fail server_save "$(call server_save '{"values":{"name":"Lab","host":"203.0.113.20","port":"22","username":"vpnuser","auth":"password"},"password":"lab-pw"}')"

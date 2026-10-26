@@ -323,6 +323,10 @@ All methods return quickly; anything slow returns `{ job }` and the view polls `
 Writes made through the plugin are committed with the ucode `uci` cursor and followed by `job converge` (no
 `config.change` event is emitted for them). `set_enabled(true)` spawns `job converge --connect` when it turns Shadow
 on, when `RUN/fatal` exists or when the phase is `error` (an explicit Connect), a plain `job converge` otherwise.
+`server_save`, `profiles_import` and the deletes keep `main.ssh_server` and `main.xray_profile` on an existing server
+and supported profile (the first one when the selected one is gone). While `enabled=0`, saving the first server or
+importing the first supported profile also sets `main.transport` to its transport when the current one has nothing
+usable selected (DESIGN §10).
 Settings use LuCI's `form.Map('shadow-vpn')`, whose `uci apply` triggers procd's reload; `settings_set` covers the
 settings outside that form (the Overview check endpoint, the Routing mode cards and list auto-refresh).
 

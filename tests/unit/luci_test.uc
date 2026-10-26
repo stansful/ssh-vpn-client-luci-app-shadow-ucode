@@ -24,6 +24,10 @@ const CONTRACT = [
 ];
 const IMPORTS = [ 'const', 'config', 'secrets', 'state', 'links', 'validate', 'lists', 'keys' ];
 
+const L1 = 'vless://11111111-1111-4111-8111-111111111111@nl.example.net:443?type=tcp&security=reality#Amsterdam';
+const L2 = 'vless://22222222-2222-4222-8222-222222222222@de.example.net:8443?type=xhttp&security=reality#Frankfurt';
+const L3 = 'vless://33333333-3333-4333-8333-333333333333@old.example.org:80?type=h2&security=none#Old';
+
 let failures = 0;
 
 function check(name, cond, why) {
@@ -51,6 +55,13 @@ function sh(cmd) {
 
 function uci_get(sec, opt) {
 	return cursor().get('shadow-vpn', sec, opt);
+}
+
+function uci_set(sec, opt, value) {
+	const c = cursor();
+
+	c.set('shadow-vpn', sec, opt, value);
+	c.commit('shadow-vpn');
 }
 
 function jobs_log() {
@@ -220,10 +231,6 @@ function run_tests(m) {
 
 	/* Profiles */
 
-	const L1 = 'vless://11111111-1111-4111-8111-111111111111@nl.example.net:443?type=tcp&security=reality#Amsterdam';
-	const L2 = 'vless://22222222-2222-4222-8222-222222222222@de.example.net:8443?type=xhttp&security=reality#Frankfurt';
-	const L3 = 'vless://33333333-3333-4333-8333-333333333333@old.example.org:80?type=h2&security=none#Old';
-
 	r = call('profiles_import', { text: `# list\n${L1}\n\n${L2}\nvless://broken\n${L3}\n`, source: 'import' });
 	check('luci: profiles_import counts added, skipped and failed',
 		r.added == 3 && r.updated == 0 && r.skipped == 3 && r.failed == 1 && r.errors?.[0]?.line == 5 &&
@@ -371,6 +378,65 @@ function run_tests(m) {
 	check('luci: attention_dismiss removes the entry', call('attention_dismiss', { id: 'a1' }).ok && length(call('status').attention) == 0);
 }
 
+/* The transport follows the first server or profile set up while Shadow is off (DESIGN §10) */
+
+// A new install's config: no servers or profiles, Shadow off, transport ssh.
+function fresh_config() {
+	sh(`rm -f ${UCI_FILE}; cp ${FIX}/shadow-vpn.config ${UCI_FILE}`);
+	clear_jobs_log();
+}
+
+function transport_tests(m) {
+	const call = (name, args) => m[name].call({ args: args ?? {} });
+	const add_server = () => call('server_save', { values: { name: 'First', host: 'first.example', port: '22', username: 'u', auth: 'password' }, password: 'pw' }).sid;
+	const transport = () => uci_get('main', 'transport');
+	let r;
+
+	fresh_config();
+	call('profiles_import', { text: L3, source: 'manual' });
+	check('luci: an unsupported profile alone leaves the transport', transport() == 'ssh' && uci_get('main', 'xray_profile') == null, transport());
+
+	r = call('profiles_import', { text: L1, source: 'manual' });
+	const p1 = uci_get('main', 'xray_profile');
+	check('luci: the first usable profile becomes the transport when SSH has no server',
+		r.added == 1 && p1 != null && transport() == 'xray', sprintf('%J %s', r, transport()));
+
+	clear_jobs_log();
+	r = call('set_enabled', { enabled: true });
+	check('luci: an Xray-only setup turns on without the transport switch',
+		r.job && uci_get('main', 'enabled') == '1' && trim(jobs_log()) == 'converge --connect', sprintf('%J %s', r, jobs_log()));
+	call('set_enabled', { enabled: false });
+
+	// SSH picked on the Overview with a profile ready: an import that selects nothing new keeps that choice
+	call('select', { transport: 'ssh', sid: '' });
+	call('profiles_import', { text: L2, source: 'manual' });
+	check('luci: a later import keeps the transport the user picked', transport() == 'ssh' && uci_get('main', 'xray_profile') == p1, transport());
+
+	fresh_config();
+	call('select', { transport: 'xray', sid: '' });
+	const s1 = add_server();
+	check('luci: the first server becomes the transport when Xray has no usable profile', s1 && transport() == 'ssh', transport());
+
+	call('select', { transport: 'xray', sid: '' });
+	const s2 = add_server();
+	check('luci: a later server keeps the transport the user picked', s2 && transport() == 'xray', transport());
+
+	call('select', { transport: 'ssh', sid: '' });
+	call('profiles_import', { text: L1, source: 'manual' });
+	check('luci: the first profile keeps a transport that has a usable selection', transport() == 'ssh' && uci_get('main', 'xray_profile') != null, transport());
+
+	call('server_delete', { sid: s1 });
+	call('server_delete', { sid: s2 });
+	check('luci: deleting the last server never switches the transport', transport() == 'ssh' && uci_get('main', 'ssh_server') == null, transport());
+
+	// Shadow left on after its only server was deleted: an import must not bring a tunnel up on its own
+	fresh_config();
+	uci_set('main', 'enabled', '1');
+	call('profiles_import', { text: L1, source: 'manual' });
+	check('luci: the first profile never switches the transport while Shadow is on', transport() == 'ssh' && uci_get('main', 'xray_profile') != null,
+		transport());
+}
+
 /* Static checks: plugin source, ACL, menu, catalogs */
 
 // ucode resolves names lexically: a top-level function called before its definition fails at run time.
@@ -468,6 +534,7 @@ try {
 
 	check('luci: the plugin compiles', type(m) == 'object');
 	run_tests(m);
+	transport_tests(m);
 	static_checks(m);
 }
 catch (e) {

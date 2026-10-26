@@ -114,7 +114,7 @@ ssh-vpn-client-luci-app-shadow-ucode/
 config shadow 'main'
 	option enabled '0'              # Shadow on/off (the user's intent)
 	option autostart '1'            # an enabled Shadow comes back after a reboot or power loss
-	option transport 'ssh'          # ssh | xray
+	option transport 'ssh'          # ssh | xray; the first server or profile set up while Shadow is off can switch it (10)
 	option ssh_server ''            # selected ssh_server section
 	option xray_profile ''          # selected profile section
 	option mode 'proxy-all'         # proxy-all | selected-rules
@@ -818,6 +818,12 @@ observatory (about 10 s) and shown as text.
   model until `/etc/config/shadow-vpn` or its uncommitted changes change (inode, mtime and size; one minute at
   most): a full load of a file with thousands of rules costs rpcd, which serves every other LuCI call meanwhile,
   a second or more on an A53.
+- The first server saved and the first supported profile imported become the selection of their transport, and a
+  deleted selection passes to the first one left. While Shadow is off, such a first server or profile also becomes
+  the transport when the current transport has nothing usable selected: a fresh install starts on SSH (5), and a
+  setup with only Xray links would otherwise refuse Turn on until the user found the Transport switch on the
+  Overview. The transport never changes this way while Shadow is on (that would start or replace a tunnel), while
+  the current transport has a usable selection, or on a delete.
 - While Shadow is on, `select` refuses a transport with nothing usable selected (it would turn the tunnel off,
   6.3); the Xray tab asks before a profile replaces a running SSH tunnel. "Pin this key" sends the fingerprint the
   page showed, and the router pins it only while it is still the key it last saw (an impostor met by a later
@@ -1227,3 +1233,9 @@ release commit made automatically):
 | the first real release failed: publish looked its new draft up in the release list a second after creating it, and the list did not have it yet ("Expected exactly one draft") | the draft is created through `POST /releases`, whose id the job keeps; assets go to `uploads.github.com` for that id; the asset check polls the draft by id; the release list only serves the clean-up of old drafts (11) |
 | a push to master started ci.yml as well as release.yml: a second, fully skipped CI run | `ci.yml` has `branches-ignore: [master]` and no per-job skip conditions; `release.yml` runs on `master` (11, 12) |
 | make-release.sh asked to push and had `--push` | the push is gone: the script commits, the owner pushes (11) |
+
+Changes from the README's quick-start check (2026-10-26):
+
+| Finding | Change |
+|---|---|
+| a setup with only Xray links could not turn on: a fresh install starts on SSH, the import selected the first profile without touching the transport (so the Xray tab showed it as selected, with no Select button), and Turn on refused with "Select or create an SSH configuration before connecting." until the user found the Transport switch on the Overview | while Shadow is off, the first server or supported profile becomes the transport when the current one has nothing usable selected (10) |

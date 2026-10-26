@@ -183,15 +183,17 @@ function selection_problem(model) {
 }
 
 // The first server or supported profile becomes the selection when the current one is gone.
+// `added` names the transport that had no server or supported profile before this write.
 // Runs on a fresh cursor after the caller committed, so a reload inside config.load() loses nothing.
-function fix_selection() {
+function fix_selection(added) {
 	const ctx = open_cursor();
 	const model = config.load(ctx);
 	const main = model.main;
 	let dirty = false;
 
 	if (!find_by(model.servers, main.ssh_server) && main.ssh_server != (model.servers[0]?.sid ?? null)) {
-		set_opt(ctx, 'main', 'ssh_server', model.servers[0]?.sid);
+		main.ssh_server = model.servers[0]?.sid;
+		set_opt(ctx, 'main', 'ssh_server', main.ssh_server);
 		dirty = true;
 	}
 
@@ -201,9 +203,18 @@ function fix_selection() {
 		const first = filter(model.profiles, x => x.supported)[0]?.sid ?? null;
 
 		if (first != main.xray_profile) {
+			main.xray_profile = first;
 			set_opt(ctx, 'main', 'xray_profile', first);
 			dirty = true;
 		}
+	}
+
+	// While Shadow is off, the first usable server or profile also takes over a transport with nothing
+	// usable selected (DESIGN §10): a fresh install starts on SSH, where an Xray-only setup cannot turn on.
+	if (added && !main.enabled && selection_missing(model) &&
+	    !selection_missing({ ...model, main: { ...main, transport: added } })) {
+		ctx.set(UCI, 'main', 'transport', added);
+		dirty = true;
 	}
 
 	if (dirty)
@@ -680,7 +691,7 @@ function server_save(req) {
 	}
 
 	ctx.commit(UCI);
-	fix_selection();
+	fix_selection(length(model.servers) ? null : 'ssh');
 	changed();
 
 	return { sid: id };
@@ -1014,7 +1025,7 @@ function profiles_import(req) {
 	if (added || updated) {
 		secrets.sync();
 		ctx.commit(UCI);
-		fix_selection();
+		fix_selection(length(filter(model.profiles, x => x.supported)) ? null : 'xray');
 		changed();
 	}
 

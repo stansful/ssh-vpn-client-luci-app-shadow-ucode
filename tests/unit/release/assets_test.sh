@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Static checks that the release pieces agree (DESIGN.md 11): the files release.yml publishes are the files
 # scripts/build-release.sh builds, they include everything install.sh downloads, the release is tagged plain
-# X.Y.Z, the tag's commit is read one way (tag_commit), and both workflows build and test the way the docs say.
+# X.Y.Z, the tag's commit is read one way (tag_commit), both workflows build and test the way the docs say, and no
+# shell variable runs into « or » (macOS's bash 3.2).
 #
 #   tests/unit/release/assets_test.sh
 #
@@ -97,6 +98,17 @@ if grep -q '^    branches: \[master\]$' "$RELEASE" && grep -q '^    branches-ign
 	ok "a push to master runs release.yml, ci.yml runs for the other branches and pull requests"
 else
 	nok "a push to master runs release.yml only" "release.yml must trigger on master, ci.yml must ignore master"
+fi
+
+# macOS's /bin/bash 3.2 in a UTF-8 locale reads the first byte of « or » as part of a name: $v right before » is
+# the variable "v\xC2", unbound under set -u. The CI's bash on Linux does not, the owner's Mac does; ${v} is safe
+unbraced="$(cd "$TREE" && LC_ALL=C grep -nE '\$[A-Za-z_][A-Za-z0-9_]*[^ -~[:space:]]' \
+	scripts/*.sh scripts/lib/*.sh .github/scripts/*.sh tests/unit/release/*.sh .github/workflows/*.yml |
+	cut -d: -f1,2 | tr '\n' ' ')"
+if [ -z "$unbraced" ]; then
+	ok "no shell variable runs into a non-ASCII character (macOS's bash 3.2 would read it as part of the name)"
+else
+	nok "no shell variable runs into a non-ASCII character" "write \${name} at $unbraced"
 fi
 
 echo "# $pass passed, $fail failed"

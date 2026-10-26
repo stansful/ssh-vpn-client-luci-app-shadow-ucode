@@ -23,7 +23,7 @@ ROOT="$(cd "$HERE/../.." && pwd -P)"
 VERSION="${VERSION:-$(cat "$ROOT/build/VERSION")}"
 
 if ! version_valid "$VERSION"; then
-	echo "::error file=build/VERSION::Версия «$VERSION» должна быть X.Y.Z (без ведущих нулей и «v»): так называются релиз и его тег. Задайте её через scripts/make-release.sh." >&2
+	echo "::error file=build/VERSION::Версия «${VERSION}» должна быть X.Y.Z (без ведущих нулей и «v»): так называются релиз и его тег. Задайте её через scripts/make-release.sh." >&2
 	exit 1
 fi
 

@@ -140,7 +140,7 @@ for v in v0.3.0 0.3 00.3.0 0.3.0-rc1 ""; do
 	if [ -z "$v" ]; then
 		check "an empty VERSION reads build/VERSION" '[ "$OUT" = new ]'
 	else
-		check "a malformed version '$v' is refused" '[ $RC = 1 ] && has_err "::error file=build/VERSION::Версия «$v» должна быть X.Y.Z"'
+		check "a malformed version '$v' is refused" '[ $RC = 1 ] && has_err "::error file=build/VERSION::Версия «${v}» должна быть X.Y.Z"'
 	fi
 done
 printf '0.3.0 \n' >"$REPO/build/VERSION"

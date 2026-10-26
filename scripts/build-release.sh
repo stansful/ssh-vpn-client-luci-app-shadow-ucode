@@ -75,7 +75,7 @@ while [ $# -gt 0 ]; do
 done
 
 version="$(cat "$ROOT/build/VERSION")"
-version_valid "$version" || die "в build/VERSION «$version», а не X.Y.Z (без ведущих нулей и «v»)."
+version_valid "$version" || die "в build/VERSION «${version}», а не X.Y.Z (без ведущих нулей и «v»)."
 
 if [ -n "$run_tests" ]; then
 	say "== Тесты: tests/unit/run.sh"

@@ -127,7 +127,7 @@ fi
 
 # --- versions
 current="$(cat build/VERSION)"
-version_valid "$current" || die "в build/VERSION «$current», а не X.Y.Z: исправьте файл вручную и закоммитьте."
+version_valid "$current" || die "в build/VERSION «${current}», а не X.Y.Z: исправьте файл вручную и закоммитьте."
 
 tags="$(git tag -l)"
 if [ -n "$has_origin" ]; then
@@ -164,8 +164,8 @@ check_version() {
 	fi
 	if ! version_valid "$v"; then
 		case $v in
-		v[0-9]* | V[0-9]*) echo "«$v»: нужна версия без «v», например ${v#?}" ;;
-		*) echo "«$v» — не версия X.Y.Z (три числа без ведущих нулей, например $suggested)" ;;
+		v[0-9]* | V[0-9]*) echo "«${v}»: нужна версия без «v», например ${v#?}" ;;
+		*) echo "«${v}» — не версия X.Y.Z (три числа без ведущих нулей, например $suggested)" ;;
 		esac
 		return 1
 	fi

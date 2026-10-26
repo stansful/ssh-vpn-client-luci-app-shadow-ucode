@@ -10,3 +10,6 @@ tests/unit/ssh/logs/*.log -text
 
 # compiled LuCI catalogs (po2lmo output)
 *.lmo binary
+
+# README screenshots
+*.png binary

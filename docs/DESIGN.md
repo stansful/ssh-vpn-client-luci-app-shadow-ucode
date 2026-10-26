@@ -49,9 +49,10 @@ handling.
 
 ```text
 ssh-vpn-client-luci-app-shadow-ucode/
-  README.md, README.en.md        what it is, install, development (Russian, English)
+  README.md, README.en.md        what it is, install, update, removal (Russian, English)
   install.sh                     one-command installer / upgrader / uninstaller
-  docs/DESIGN.md                 this file; docs/CONTRACTS.md: the module contracts
+  docs/DESIGN.md                 this file; docs/CONTRACTS.md: the module contracts; docs/DEVELOPMENT.md: tests,
+                                 CI, releases; docs/images/: the README's screenshots and diagram
   shadow-vpn/                    backend package (noarch)
     files/etc/init.d/shadow-vpn
     files/etc/hotplug.d/iface/99-shadow-vpn

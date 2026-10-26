@@ -105,6 +105,7 @@ DNS-запроса. Встроенная в xray проверка следит �
 shadow-vpn/            пакет с бэкендом: init-скрипт, ucode-модули, помощники
 luci-app-shadow-vpn/   страницы LuCI, плагин rpcd, переводы
 build/                 mk_apk.sh (сборка .apk в Alpine), po2lmo.py, VERSION
+scripts/               make-release.sh (новая версия), build-release.sh (сборка релиза)
 install.sh             установщик
 tests/unit/            unit-тесты (ucode в образе роутера) и тесты в Docker
 tests/lab/             лаборатория: прошивка TR3000 в Docker
@@ -119,7 +120,9 @@ tests/lab/             лаборатория: прошивка TR3000 в Docker
 BUILD_ONLY=1 tests/lab/up.sh          # образы лаборатории (один раз)
 tests/unit/run.sh                     # unit-тесты
 node tests/unit/luci/check_views.mjs  # страницы LuCI и русский перевод
+tests/unit/release/run.sh             # тесты скриптов релиза (bash и git, без Docker)
 build/mk_apk.sh                       # пакеты в out/
+scripts/build-release.sh              # файлы релиза в out/, как в CI (--test: сначала тесты)
 
 tests/lab/up.sh                       # поднять лабораторию
 tests/lab/e2e-shadow.sh install stage1 stage2 stage3   # установка и сценарии, около 8 минут
@@ -130,16 +133,31 @@ tests/lab/down.sh                     # убрать лабораторию
 `tests/unit/luci/rpcd-smoke.sh`, `tests/unit/ssh/e2e.sh`. Векторы для парсера ссылок посчитаны кодом десктопа:
 скрипты в `tests/unit/vectors/` и `tests/unit/links/` пересчитывают их из его исходников (`DESKTOP_SRC`).
 
-**CI** (`.github/workflows/ci.yml`) гоняет всё это на каждый push и pull request на arm64-раннерах GitHub.
+**CI** (`.github/workflows/ci.yml`) гоняет всё это на каждый push и pull request на arm64-раннерах GitHub;
+push в ветку по умолчанию проверяет `.github/workflows/release.yml` (тот же CI, один раз).
 
 Роутеры берут `install.sh` из ветки по умолчанию, а пакеты — из последнего релиза. Поэтому `install.sh` в ветке
 обязан ставить текущий релиз: `install_test.sh` в CI ставит им настоящий релиз с GitHub, а пока релизов нет,
 проверяет, что установщик сообщает именно об этом. Имена файлов релиза и формат `SHA256SUMS` меняйте только
 совместимо: GitHub отдаёт старый `install.sh` из кэша ещё до 5 минут после пуша.
 
-**Релиз:** поднимите версию в `build/VERSION`, поставьте тег `vX.Y.Z` на коммит с зелёным CI и запушьте тег.
-`.github/workflows/release.yml` сначала ещё раз прогонит на этом коммите весь CI и только потом соберёт пакеты
-и опубликует релиз, помеченный последним: из него установщик и берёт пакеты. Если CI упал, релиз не выходит:
-перезапустите упавшие задания или исправьте коммит и перенесите тег.
+**Релиз:**
+
+```bash
+scripts/make-release.sh               # покажет текущую версию, спросит новую (Enter — следующий патч), закоммитит
+git push                              # если не запушили из скрипта: пуш в ветку по умолчанию запускает релиз
+```
+
+`scripts/make-release.sh` проверяет, что дерево чистое, а новая версия X.Y.Z (без «v») выше текущей и всех
+релизных тегов, пишет её в `build/VERSION` и коммитит только этот файл как `feat: release - version X.Y.Z`;
+пушит по вопросу или с `--push`. Без вопросов: `scripts/make-release.sh 0.2.0 --yes --push`. Теги скрипт не
+ставит. На каждый push в ветку по умолчанию `.github/workflows/release.yml` прогоняет весь CI (с лабораторией) и,
+если версии из `build/VERSION` ещё нет среди релизов, собирает файлы через `scripts/build-release.sh` и публикует
+релиз `X.Y.Z`: тег `X.Y.Z` на этом коммите, сначала черновик, проверка загрузок, затем публикация как последнего
+релиза — из него установщик и берёт пакеты. Если версия уже выпущена, запуск кончается подсказкой поднять её.
+Если CI упал, релиз не выходит: перезапустите упавшие задания или запушьте исправление.
+
+Локальная сборка релиза — `scripts/build-release.sh` (то же, что делает CI): пакеты, `install.sh` и `SHA256SUMS`
+в `out/`; время файлов берётся из коммита, поэтому один коммит даёт те же файлы, что и в релизе.
 
 Shadow для компьютера (Windows, macOS, Linux) — [stansful/ssh-vpn-client-electron](https://github.com/stansful/ssh-vpn-client-electron).

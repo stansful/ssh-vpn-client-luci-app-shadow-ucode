@@ -67,13 +67,18 @@ ssh-vpn-client-luci-app-shadow-ucode/
     root/usr/share/rpcd/ucode/luci.shadow-vpn
     po/{templates,ru}/shadow-vpn.po(t)
   build/                         mk_apk.sh (Alpine `apk mkpkg`), po2lmo.py, VERSION
+  scripts/                       make-release.sh (new version + release commit), build-release.sh (the release
+                                 files, as CI builds them), lib/version.sh (X.Y.Z checks and comparison, section 11)
   tests/
-    unit/                        ucode tests run inside the lab router image (run.sh), host-side docker tests
+    unit/                        ucode tests run inside the lab router image (run.sh), host-side docker tests,
+                                 release/ (the release scripts' tests: bash and git)
     lab/                         Docker lab: up.sh, down.sh, e2e-shadow.sh (Shadow), tests/e2e.sh (research proofs)
   .github/workflows/
-    ci.yml                       every push and pull request: unit, host docker and lab tests (section 12)
-    release.yml                  tag vX.Y.Z: the whole CI (ci.yml) on that commit, then build and publish the
-                                 release install.sh downloads (section 11)
+    ci.yml                       every push and pull request: lint, unit, host docker and lab tests (section 12);
+                                 a push to the default branch is left to release.yml
+    release.yml                  every push to master: the whole CI (ci.yml), then, for a version with
+                                 no release yet, build and publish the release X.Y.Z install.sh downloads (section 11)
+  .github/scripts/               release-state.sh (new/retry/released), release-notes.sh
   .github/actions/lab-host/      CI: host kernel modules, firmware cache, lab images (BUILD_ONLY=1 up.sh)
 ```
 
@@ -847,9 +852,11 @@ them at once (raw.githubusercontent.com caches the file for up to 5 minutes, so 
 old one can still meet the other side's new files). The rule: `install.sh` on the default branch always installs the
 current latest release, and the asset names, the `SHA256SUMS` format and `SHADOW_BASE_URL` change only compatibly
 both ways. `tests/unit/packaging/install_test.sh` checks the first half on every push: the tree's `install.sh`
-installs the latest release from GitHub the way a router does, or, while none is published, says so. Release runs
-skip that check (`PUBLISHED_RELEASE=skip`): the release they publish replaces that one, and a broken latest release
-must not block its own fix. The `install.sh` copy in a release is for reference; nothing downloads it.
+installs the latest release from GitHub the way a router does, or, while none is published, says so. A release run
+that publishes a new version skips that check (`PUBLISHED_RELEASE=skip`): the release it publishes replaces that
+one, and a broken latest release must not block its own fix; a push to the default branch whose version is already
+released keeps the check. The `install.sh` copy in a release is for reference (its sum is in `SHA256SUMS`); nothing
+downloads it.
 
 `install.sh` (busybox ash, `uclient-fetch` as wget):
 
@@ -906,19 +913,58 @@ on an upgrade, so an upgrade keeps Shadow on. `/etc/config/shadow-vpn` and `/etc
 
 Builds: `build/mk_apk.sh` re-runs itself in `alpine:3.23` with docker and writes `out/`. The tree goes into the
 builder as a tar stream and the result is checked against `SHA256SUMS` on the host: OrbStack bind mounts can show a
-stale, cut-off copy of a file that was just rewritten.
+stale, cut-off copy of a file that was just rewritten. `scripts/build-release.sh [--test] [--out DIR]` is the
+release build, run alike by a developer, the CI's `unit` job and the release workflow: (with `--test` first
+`tests/unit/run.sh` and `check_views.mjs`) `sh -n install.sh`, `mk_apk.sh` with `STRICT=1`, `install.sh` next to the
+packages and `SHA256SUMS` over the three packages and `install.sh`, checked, then it prints the version, the files
+with their sizes and the sums. `SOURCE_DATE_EPOCH` is the HEAD commit's time, so one commit gives byte-identical files
+on macOS, on Linux and in CI (checked: a macOS build through docker and a native build as root in `alpine:3.23` of
+one commit have the same sums); it warns when the tree has uncommitted changes. The extra `install.sh` line in
+`SHA256SUMS` has the format every install.sh accepts, and install.sh only looks up the lines it needs.
 
-Release: bump `build/VERSION`, push the tag `vX.Y.Z` on a commit whose CI is green (or run the workflow by hand with
-that version, which tags the dispatched commit) → `.github/workflows/release.yml` first runs the whole CI on that
-commit (`ci.yml` through `workflow_call`, the lab included) and builds nothing unless it passes; a failed run
-publishes nothing, so the failed jobs can be re-run or the tag moved to the fixed commit (no release of that version
-exists yet). Then it checks that the tag is `v` + `build/VERSION`, builds the
-packages with `STRICT=1` in an Alpine container (`apk mkpkg`, files owned by root, `/lib/apk/packages/<pkg>.list`),
-compiles the `.lmo`, writes `SHA256SUMS` and publishes the release `vX.Y.Z` with the three packages,
-`SHA256SUMS` and `install.sh`, marked latest, which is what install.sh downloads. Release notes, Russian first and
-then English: the install command, the tag's message (an annotated tag) and the commits since the previous `v*` tag. A version lower than the current latest release
-(a fix on an older line) is published without the latest mark, so routers never move back unasked. A usign
-signature over `SHA256SUMS` with the public key embedded in install.sh is optional hardening for later.
+Versions (`scripts/lib/version.sh`, shared by the release scripts): `X.Y.Z`, three decimal numbers without leading
+zeros, no `v`; the same string is `build/VERSION`, the release's name and its tag; the packages are `X.Y.Z-r1`.
+Tags `vX.Y.Z` (what the first release workflow would have created) count as version X.Y.Z. Comparison is numeric
+per part in bash (BSD sort has no `-V`).
+
+Release, as in the desktop app: `scripts/make-release.sh` (bash 3.2 on macOS or 5 on Linux, any directory) refuses
+a dirty tree (tracked changes, staged or not; untracked files only warn), a detached HEAD and a malformed
+`build/VERSION`, warns off the default branch (`origin/HEAD`, else `master`/`main`) and when the branch is behind
+`origin`; prints the current version and the highest release tag (local tags and `git ls-remote --tags origin`),
+suggests the next patch version of the higher of the two, and takes a version only when it is X.Y.Z, no tag of it
+exists and it is higher than the current version and every tag. It writes `build/VERSION`, shows the diff, asks
+(`--yes` skips the questions, `--no-commit` stops here), commits only that file as `feat: release - version X.Y.Z`
+(a failed or declined commit puts the file back; git hooks run on the commit's own index, so a commit that a hook
+added other files to or changed the version in is undone the same way) and pushes the branch, never tags, when
+asked (default no) or with `--push`. It never creates tags: GitHub creates the tag when the workflow publishes.
+
+`.github/workflows/release.yml` runs on every push to `master` (the trigger names it; the gate also requires it to be
+`github.event.repository.default_branch`) and by hand:
+
+1. `gate` reads `build/VERSION` and runs `.github/scripts/release-state.sh` (a port of the desktop's): `released` when
+   GitHub has a published release of that version (then the run ends with a notice to bump the version with
+   `scripts/make-release.sh`), `new` with no tag yet, `retry` when the tag is already on this commit without a
+   release; it fails for a version that is not X.Y.Z, one not higher than every other release tag on origin, and a
+   tag of the version on another commit.
+2. `quality` is the whole CI (`ci.yml` through `workflow_call`, the lab included) on every push to the default
+   branch, released or not, even when the gate failed; `ci.yml` skips its own run of such a push, so the checks run
+   once. It skips `install_test.sh`'s check of the published release only when this run replaces that release.
+3. `build` (only for `new`/`retry`, after `quality` passed) runs `scripts/build-release.sh` and checks that the
+   output is exactly the five assets and matches `SHA256SUMS`.
+4. `publish` (the only job with `contents: write`) checks the state again (a re-run may come days later), refuses
+   when `.github/workflows` changed on the default branch after this commit (`GITHUB_TOKEN` cannot create a tag
+   there; the newer run releases), deletes leftover drafts, creates the release `X.Y.Z` as a draft with the five
+   assets targeting the built commit, checks every upload's size, state and sha256 digest, publishes it with
+   `make_latest=true` and checks that `/releases/latest` is this version and the tag is on this commit. A draft is
+   deleted when the job fails before publishing. Notes (`.github/scripts/release-notes.sh`), Russian first and then
+   English: the install command and the commit subjects since the previous release tag in this commit's history,
+   without merges and release commits.
+
+One release runs at a time per ref; a running one is never cancelled (it could leave a draft), a newer pending run
+replaces an older pending one. A failed run publishes nothing: re-run the failed jobs or push a fix (the version is
+still unreleased). As every new version must be higher than every tag, the new release is always the latest, so
+routers never move back. A usign signature over `SHA256SUMS` with the public key embedded in install.sh is optional
+hardening for later.
 
 ## 12. Testing
 
@@ -958,16 +1004,29 @@ signature over `SHA256SUMS` with the public key embedded in install.sh is option
   tunnelling without a restart; port forward works in full mode and with a device rule; one IP in both proxy and
   direct sets goes to the tunnel; profile switch restarts xray; a rejected dnsmasq file rolls back; LAN Pi-hole
   upstream does not loop; QUIC reject in SSH mode and with Vision; LuCI pages smoke.
-- **CI** (`.github/workflows/ci.yml`, every push and pull request, `ubuntu-24.04-arm`; `release.yml` calls it on
-  the commit it releases, 11): `unit` builds the lab
+- **CI** (`.github/workflows/ci.yml`, every push and pull request, `ubuntu-24.04-arm`; a push to the default branch
+  is tested by `release.yml`, which calls it through `workflow_call`, and `ci.yml` skips its own run of that push,
+  11): `lint` (`ubuntu-24.04`) runs actionlint over the workflows (with shellcheck over their `run:` scripts), shellcheck `-x` over
+  `scripts/`, `.github/scripts/` and `tests/unit/release/` (the pinned actionlint image's shellcheck 0.11.0, `-f gcc`:
+  that static build cannot print Cyrillic source lines) and `tests/unit/release/run.sh`; `unit` builds the lab
   images (`tests/lab/dl` cached by firmware version and sha256), runs `tests/unit/run.sh`, `check_views.mjs` and
-  `build/mk_apk.sh` with `STRICT=1` (the packages are a run artifact); `host-docker` runs `install_test.sh` (with
-  the published release check of 11, skipped in release runs), `rpcd-smoke.sh` and `ssh/e2e.sh`; `lab` brings the
-  lab up and runs `e2e-shadow.sh install stage1 stage2 stage3`, keeping the router's logs as an artifact when it
-  fails. The scripts know no OrbStack specifics: br_netfilter's
+  `scripts/build-release.sh` (the release files are a run artifact); `host-docker` runs `install_test.sh` (with
+  the published release check of 11, skipped in a run that publishes a release), `rpcd-smoke.sh` and `ssh/e2e.sh`;
+  `lab` brings the lab up and runs `e2e-shadow.sh install stage1 stage2 stage3`, keeping the router's logs as an
+  artifact when it fails. The scripts know no OrbStack specifics: br_netfilter's
   sysctls are set only where the host kernel has them, the interface names need Docker Engine 28+ (checked), the lab
   networks use the `nat-unprotected` gateway mode (a host that filters bridged traffic would otherwise drop the
   LAN's direct connections), files the lab generates belong to the host user.
+- **Release scripts** (`tests/unit/release/run.sh`; bash 3.2+ and git on the host, no Docker; `TEST_BASH=<bash>`
+  picks the bash): `make-release_test.sh` runs `scripts/make-release.sh` from outside throwaway clones of a local
+  bare origin (the prompt and Enter, refused versions and tags, local/origin/legacy tags, a dirty tree, the commit
+  and its single file, pre-commit hooks that stage other files or fail, `--push` without tags, other branches,
+  detached HEAD, a branch behind origin, no origin); `release-state_test.sh` runs `release-state.sh` against a bare
+  origin with tags and a curl stub for the GitHub API, and `tag_commit` (lightweight and annotated tags);
+  `release-notes_test.sh` the notes' previous tag and commit list; `assets_test.sh` checks that release.yml,
+  build-release.sh and install.sh name the same files, that the tag is plain X.Y.Z and that release.yml reads the
+  tag's commit with `tag_commit` like release-state.sh. They pass under macOS
+  `/bin/bash` 3.2 (BSD tools), bash 5.2 in `ubuntu:24.04` (GNU) and bash 5.3 in `alpine:3.23` (busybox).
 - Every test is deterministic: no assertion races random jitter or a tight timer window.
 - Not testable in the lab: the 6.12 kernel and kmod loading, MT7981 hardware offload, Wi-Fi, real flash/RAM
   pressure, PPPoE/DHCP WAN. Covered by the installer's checks and a manual test on the router.
@@ -1149,3 +1208,17 @@ Changes from the review of the standalone repository (2026-10-26):
 | install.sh from the default branch meets the packages of the latest release, and nothing checked that pair | the rule in 11; `install_test.sh` installs the latest release from GitHub with the tree's install.sh |
 | with no release published, install.sh asked to check access to github.com | HTTP 404 for the latest release: "no release is published yet" (11) |
 | the release notes were English only | Russian first, then English |
+
+Changes for the release scripts (2026-10-26; owner: two scripts and a release CI like the desktop app's, the
+release commit made automatically):
+
+| Finding | Change |
+|---|---|
+| a release needed a hand-edited `build/VERSION` and a hand-pushed `vX.Y.Z` tag; nothing checked that the version went up | `scripts/make-release.sh`: shows the current version and the last tag, suggests the next patch, refuses a version that is not X.Y.Z or not higher than the current one and every local or origin tag, commits only `build/VERSION` as `feat: release - version X.Y.Z`, pushes on request; no tags (11) |
+| the release build lived in the workflow, so a local build could differ from the release | `scripts/build-release.sh`: the same build for a developer, CI's `unit` job and release.yml; `SHA256SUMS` also covers `install.sh`; same commit, same sums on macOS, Linux and CI (11) |
+| release.yml started from a tag push, unlike the desktop app | the desktop model: every push to the default branch runs the whole CI, and a version without a release is built and published as `X.Y.Z` (plain tag on the built commit, draft first, uploads checked, latest); a released version ends with a notice to bump it; gate in `release-state.sh` (new/retry/released, not higher than a tag, tag elsewhere) (11) |
+| with release.yml calling ci.yml on every default-branch push, that push would run the whole CI and the lab twice | every ci.yml job skips a push to the default branch unless release.yml called it (`inputs.release`); `publishing` alone decides the published-release check (11, 12) |
+| a running release's tests could be cancelled by ci.yml's `cancel-in-progress` | `cancel-in-progress: ${{ !inputs.release }}` |
+| shellcheck through actionlint covers only `run:` blocks | `lint` job: shellcheck `-x -f gcc` over the release scripts and their tests, then `tests/unit/release/run.sh` (12) |
+| shellcheck of the pinned actionlint image crashed ("commitBuffer: invalid argument") when a finding's source line has Cyrillic, whatever the locale | `-f gcc`, which prints no source lines (12) |
+| nothing kept release.yml's asset list, build-release.sh and the files install.sh downloads in step | `tests/unit/release/assets_test.sh` (12) |

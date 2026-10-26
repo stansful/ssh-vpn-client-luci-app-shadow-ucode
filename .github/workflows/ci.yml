@@ -1,8 +1,11 @@
-# Tests on every push and pull request, and on the commit release.yml is about to release (workflow_call:
-# nothing is published from a commit whose tests fail). The lab jobs run on GitHub's arm64 runners, so the
-# Cudy TR3000's aarch64 OpenWrt rootfs runs natively in Docker (tests/lab/README.md).
-#   actionlint   the workflows
-#   unit         ucode unit tests in the router image, the LuCI views, po2lmo, the release build (artifact)
+# Tests on every push and pull request. A push to the default branch is tested by release.yml instead, which
+# calls this workflow (workflow_call) before it builds and publishes anything: this workflow skips its own run of
+# such a push, so the checks run once per push. The lab jobs run on GitHub's arm64 runners, so the Cudy TR3000's
+# aarch64 OpenWrt rootfs runs natively in Docker (tests/lab/README.md).
+#   lint         actionlint (the workflows), shellcheck and the tests of the release scripts (scripts/,
+#                .github/scripts/)
+#   unit         ucode unit tests in the router image, the LuCI views, po2lmo, the release build
+#                (scripts/build-release.sh, artifact)
 #   host-docker  install.sh on the factory rootfs (and against the release published on GitHub), the rpcd
 #                plugin, the SSH helpers against a real sshd
 #   lab          the whole lab: install, stage1 (main paths), stage2 (failures), stage3 (boot, upgrade, removal)
@@ -16,7 +19,11 @@ on:
   workflow_call:
     inputs:
       release:
-        description: Called by release.yml; install_test.sh skips the published release, which this one replaces
+        description: Called by release.yml, which runs these checks on every push to the default branch
+        type: boolean
+        default: false
+      publishing:
+        description: release.yml publishes this commit's version after these checks; install_test.sh then skips the published release, which the new one replaces
         type: boolean
         default: false
 
@@ -24,29 +31,44 @@ permissions:
   contents: read
 
 # github.workflow is the caller's name under workflow_call: a release's tests never cancel, and are never
-# cancelled by, the tests of a push to the same ref.
+# cancelled by, the tests of a push to the same ref, and a running release never loses its tests.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !inputs.release }}
 
 defaults:
   run:
     shell: bash --noprofile --norc -euo pipefail {0}
 
 jobs:
-  actionlint:
+  lint:
+    # a push to the default branch is tested by release.yml (workflow_call), not here as well
+    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
+    env:
+      ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # the workflows, with shellcheck over their run: scripts
       - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo "$ACTIONLINT_IMAGE" -color
+      # actionlint does not look at script files; the same image's shellcheck (0.11.0) does. -f gcc: this static
+      # build cannot print the Cyrillic source lines of its default format, whatever the locale
+      - name: shellcheck (release scripts)
+        if: ${{ !cancelled() }}
         run: |
-          docker run --rm -v "$PWD:/repo" -w /repo \
-            rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
+          docker run --rm -v "$PWD:/repo" -w /repo --entrypoint shellcheck "$ACTIONLINT_IMAGE" -x -f gcc \
+            scripts/*.sh scripts/lib/*.sh .github/scripts/*.sh tests/unit/release/*.sh
+      - name: Release scripts tests (make-release.sh, release-state.sh, release-notes.sh)
+        if: ${{ !cancelled() }}
+        run: tests/unit/release/run.sh
 
   unit:
+    # a push to the default branch is tested by release.yml (workflow_call), not here as well
+    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
@@ -65,13 +87,10 @@ jobs:
       - name: po2lmo
         if: ${{ !cancelled() }}
         run: tests/unit/packaging/po2lmo_test.sh
-      - name: Build packages (STRICT)
+      # what release.yml publishes: the packages (STRICT), install.sh and SHA256SUMS
+      - name: Release build (scripts/build-release.sh)
         if: ${{ !cancelled() }}
-        env:
-          STRICT: "1"
-        run: |
-          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) build/mk_apk.sh
-          cp install.sh out/install.sh
+        run: scripts/build-release.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
@@ -80,6 +99,8 @@ jobs:
           if-no-files-found: error
 
   host-docker:
+    # a push to the default branch is tested by release.yml (workflow_call), not here as well
+    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
@@ -91,7 +112,7 @@ jobs:
         env:
           # this install.sh against the latest release on GitHub (what routers run); not while release.yml
           # replaces that release
-          PUBLISHED_RELEASE: ${{ inputs.release && 'skip' || 'check' }}
+          PUBLISHED_RELEASE: ${{ inputs.publishing && 'skip' || 'check' }}
         run: tests/unit/packaging/install_test.sh
       - name: rpcd plugin smoke test
         if: ${{ !cancelled() }}
@@ -101,6 +122,8 @@ jobs:
         run: tests/unit/ssh/e2e.sh
 
   lab:
+    # a push to the default branch is tested by release.yml (workflow_call), not here as well
+    if: inputs.release || github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     steps:

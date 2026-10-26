@@ -104,6 +104,7 @@ Known limits (browser DoH bypasses split mode, for one) are listed in
 shadow-vpn/            the backend package: init script, ucode modules, helpers
 luci-app-shadow-vpn/   the LuCI pages, the rpcd plugin, translations
 build/                 mk_apk.sh (builds the .apk files in Alpine), po2lmo.py, VERSION
+scripts/               make-release.sh (a new version), build-release.sh (the release build)
 install.sh             the installer
 tests/unit/            unit tests (ucode in the router image) and Docker tests
 tests/lab/             the lab: TR3000 firmware in Docker
@@ -118,7 +119,9 @@ Engine 28+. The lab boots the real Cudy TR3000 firmware (OpenWrt 25.12.6) with p
 BUILD_ONLY=1 tests/lab/up.sh          # the lab images (once)
 tests/unit/run.sh                     # unit tests
 node tests/unit/luci/check_views.mjs  # the LuCI pages and the Russian catalog
+tests/unit/release/run.sh             # the release scripts' tests (bash and git, no Docker)
 build/mk_apk.sh                       # packages into out/
+scripts/build-release.sh              # the release files into out/, as CI builds them (--test: tests first)
 
 tests/lab/up.sh                       # bring the lab up
 tests/lab/e2e-shadow.sh install stage1 stage2 stage3   # install and the scenarios, about 8 minutes
@@ -130,16 +133,32 @@ Docker tests outside the lab: `tests/unit/packaging/install_test.sh` (the instal
 app's code: the scripts in `tests/unit/vectors/` and `tests/unit/links/` recompute them from its sources
 (`DESKTOP_SRC`).
 
-**CI** (`.github/workflows/ci.yml`) runs all of it on every push and pull request on GitHub's arm64 runners.
+**CI** (`.github/workflows/ci.yml`) runs all of it on every push and pull request on GitHub's arm64 runners; a
+push to the default branch is tested by `.github/workflows/release.yml` (the same CI, once).
 
 Routers take `install.sh` from the default branch and the packages from the latest release, so the `install.sh` on
 the branch must install the current release: `install_test.sh` in CI installs the real release from GitHub with it,
 and while there is none, checks that the installer says so. Change the release's file names and the `SHA256SUMS`
 format only compatibly: GitHub serves the old `install.sh` from its cache for up to 5 minutes after a push.
 
-**Releases:** bump `build/VERSION`, tag a commit whose CI is green with `vX.Y.Z` and push the tag.
-`.github/workflows/release.yml` runs the whole CI on that commit once more, and only then builds the packages and
-publishes a release marked latest, which is where the installer takes the packages from. When that CI fails,
-nothing is released: re-run the failed jobs, or fix the commit and move the tag.
+**Releases:**
+
+```bash
+scripts/make-release.sh               # shows the current version, asks for the new one (Enter: next patch), commits
+git push                              # unless the script pushed: a push to the default branch starts the release
+```
+
+`scripts/make-release.sh` checks that the tree is clean and that the new version X.Y.Z (no "v") is higher than the
+current one and every release tag, writes it to `build/VERSION` and commits only that file as
+`feat: release - version X.Y.Z`; it pushes when you agree or with `--push`. Without questions:
+`scripts/make-release.sh 0.2.0 --yes --push`. It creates no tags. On every push to the default branch
+`.github/workflows/release.yml` runs the whole CI (the lab included) and, when the version in `build/VERSION` has no
+release yet, builds the files with `scripts/build-release.sh` and publishes release `X.Y.Z`: the tag `X.Y.Z` on that
+commit, a draft first, the uploads checked, then published as the latest release, which is where the installer
+takes the packages from. When the version is released already, the run ends with a hint to bump it. When the CI
+fails, nothing is released: re-run the failed jobs, or push a fix.
+
+A local release build is `scripts/build-release.sh` (what CI runs): the packages, `install.sh` and `SHA256SUMS` in
+`out/`; the files get the commit's time, so one commit gives the same files as its release.
 
 Shadow for your computer (Windows, macOS, Linux): [stansful/ssh-vpn-client-electron](https://github.com/stansful/ssh-vpn-client-electron).

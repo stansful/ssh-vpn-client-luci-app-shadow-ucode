@@ -7,7 +7,8 @@
 # Builds the packages from the current tree; files other areas have not written yet are filled in
 # from stubs/ (each one is listed). Serves the build from a throwaway web container and runs
 # install.sh with SHADOW_BASE_URL. At the end this install.sh installs the latest release published on
-# GitHub, or says that none is published yet (PUBLISHED_RELEASE=skip skips that part; release.yml does).
+# GitHub, or says that none is published yet (PUBLISHED_RELEASE=skip skips that part: release.yml sets it only
+# in a run that publishes a new version; every other run checks the published release).
 # Needs the lab images (BUILD_ONLY=1 tests/lab/up.sh), Docker and Internet access for the official
 # package feed and GitHub. Its containers and network are named
 # shv-packaging-* and removed on exit (KEEP=1 keeps them and the work dir for debugging).
@@ -353,9 +354,10 @@ expect "uninstall again says not installed" "rc=$rc" sh -c "[ $rc = 0 ] && grep 
 
 # --- the published release (DESIGN.md 11). Routers run install.sh from the default branch with the packages of
 # the latest GitHub release, so this install.sh must install that release, fetched from GitHub the way a router
-# does (no SHADOW_BASE_URL); before the first release it must say that none is published. release.yml runs these
-# tests with PUBLISHED_RELEASE=skip: the release it publishes replaces that one, and a broken latest release must
-# not block the release that fixes it.
+# does (no SHADOW_BASE_URL); before the first release it must say that none is published. Only a release.yml run
+# that publishes a new version sets PUBLISHED_RELEASE=skip: the release it publishes replaces that one, and a
+# broken latest release must not block the release that fixes it. Every other run checks it: ci.yml, and
+# release.yml on a push to the default branch whose version is released already (or whose gate failed).
 REPO="$(sed -n 's/^REPO=//p' "$TREE/install.sh")"
 if [ "${PUBLISHED_RELEASE:-check}" = skip ]; then
 	ok "the published release # SKIP PUBLISHED_RELEASE=skip"

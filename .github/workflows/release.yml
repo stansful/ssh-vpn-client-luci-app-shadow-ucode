@@ -1,30 +1,27 @@
-# Builds the Shadow for OpenWrt packages and publishes the GitHub release vX.Y.Z (X.Y.Z = build/VERSION)
-# with shadow-vpn.apk, luci-app-shadow-vpn.apk, luci-i18n-shadow-vpn-ru.apk, SHA256SUMS and install.sh.
-# install.sh downloads the packages from the latest release, so the release is marked latest, unless its
-# version is lower than the current latest one (a fix on an older line): routers never move back unasked.
-#
-# Start it by pushing the tag vX.Y.Z (it must match build/VERSION), or by hand with that version, which tags
-# the dispatched commit. The whole CI (ci.yml) runs on that commit first: nothing is built or published from a
-# commit whose tests fail. Tag a commit whose CI is green already; if the release's CI still fails, re-run the
-# failed jobs, or fix the commit and move the tag (no release of that version exists yet).
+# Releases Shadow for OpenWrt from the default branch, like the desktop app's release workflow (DESIGN.md 11).
+# Every push to the default branch runs the whole CI (ci.yml through workflow_call, the lab included; ci.yml skips
+# its own run of that push, so the checks run once). When the version in build/VERSION has no release yet, the
+# packages are built with scripts/build-release.sh (what a local build runs) and published as release X.Y.Z: a
+# plain tag, no "v", on the built commit; a draft first, every upload checked, then published as the latest
+# release, which install.sh downloads. A version that is released already ends the run with a notice: bump it
+# with scripts/make-release.sh, which commits "feat: release - version X.Y.Z". Nothing is built or published from
+# a commit whose checks fail; re-run the failed jobs, or push a fix (the version is still unreleased).
 name: Release
 
 on:
+  # Releases come from master only; ci.yml tests pushes to the other branches. The gate also checks that master is
+  # the default branch.
   push:
-    tags: ["v*"]
+    branches: [master]
   workflow_dispatch:
-    inputs:
-      version:
-        description: Version to release, X.Y.Z (must match build/VERSION; tags the dispatched commit vX.Y.Z)
-        required: true
-        type: string
 
 permissions:
   contents: read
 
-# One release at a time; a running one is never cancelled half-way through its uploads.
+# The next run's gate starts only after this one has published. A newer pending run replaces an older pending
+# one; a running release is never cancelled, since that can leave a draft behind.
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 defaults:
@@ -32,78 +29,112 @@ defaults:
     shell: bash --noprofile --norc -euo pipefail {0}
 
 env:
-  ASSETS: shadow-vpn.apk luci-app-shadow-vpn.apk luci-i18n-shadow-vpn-ru.apk SHA256SUMS install.sh
+  # What every release publishes: scripts/build-release.sh builds exactly these, install.sh downloads the
+  # packages and SHA256SUMS
+  ASSETS: shadow-vpn.apk luci-app-shadow-vpn.apk luci-i18n-shadow-vpn-ru.apk install.sh SHA256SUMS
 
 jobs:
-  ci:
+  gate:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.gate.outputs.version }}
+      should_release: ${{ steps.gate.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /build/VERSION
+            /scripts/lib/
+            /.github/scripts/
+          sparse-checkout-cone-mode: false
+
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state=$(bash .github/scripts/release-state.sh)
+          version=$(cat build/VERSION)
+          case $state in
+            released)
+              echo "::notice title=Релиз пропущен::Версия $version уже выпущена. Чтобы выпустить новую, поднимите версию через scripts/make-release.sh (коммит «feat: release - version X.Y.Z») и запушьте коммит."
+              should_release=false
+              ;;
+            retry)
+              echo "::notice::Тег $version уже стоит на этом коммите, а релиза нет: публикую его."
+              should_release=true
+              ;;
+            *) should_release=true ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
+
+  # Every push to the default branch, released or not, gets the whole CI here (ci.yml skips its own run of such
+  # a push). It runs even when the gate refused the version, so the push is still tested.
+  quality:
+    needs: gate
+    if: ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
     with:
       release: true
+      # install_test.sh skips the published release only when this run replaces it
+      publishing: ${{ needs.gate.outputs.should_release == 'true' }}
 
   build:
-    needs: ci
+    needs: [gate, quality]
+    if: needs.gate.outputs.should_release == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    outputs:
-      version: ${{ steps.version.outputs.version }}
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.gate.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - id: version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          version=$(tr -d '[:space:]' < build/VERSION)
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error file=build/VERSION::'$version' is not X.Y.Z."
-            exit 1
-          fi
-          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match build/VERSION ($version)."
-            exit 1
-          fi
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "${INPUT_VERSION#v}" != "$version" ]; then
-            echo "::error::The version to release ($INPUT_VERSION) does not match build/VERSION ($version)."
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+      # build/mk_apk.sh with STRICT=1 in alpine:3.23 (docker), install.sh and SHA256SUMS. The files get the
+      # commit's time, so a local build of this commit gives the same files.
+      - name: Build (scripts/build-release.sh)
+        run: scripts/build-release.sh --out "$RUNNER_TEMP/out"
 
-      - name: Check the installer
-        run: sh -n install.sh
-
-      # mk_apk.sh runs itself in alpine:3.23 (apk-tools 3) with docker. STRICT refuses a release
-      # that misses a file every release must contain.
-      - name: Build packages
-        env:
-          STRICT: "1"
-          VERSION: ${{ steps.version.outputs.version }}
+      - name: Check the assets
         run: |
-          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) OUT="$RUNNER_TEMP/out" sh build/mk_apk.sh "$VERSION"
-          cp install.sh "$RUNNER_TEMP/out/install.sh"
+          if [ "$(cat build/VERSION)" != "$VERSION" ]; then
+            echo "::error file=build/VERSION::build/VERSION is not $VERSION."
+            exit 1
+          fi
           cd "$RUNNER_TEMP/out"
+          expected=$(tr ' ' '\n' <<<"$ASSETS" | LC_ALL=C sort)
+          actual=$(find . -mindepth 1 -maxdepth 1 -printf '%P\n' | LC_ALL=C sort)
+          if [ "$expected" != "$actual" ]; then
+            echo "::error::The build holds ${actual//$'\n'/ }, not ${expected//$'\n'/ }."
+            exit 1
+          fi
           sha256sum -c SHA256SUMS
-          for f in $ASSETS; do [ -s "$f" ] || { echo "::error::$f was not built."; exit 1; }; done
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: release-assets
+          name: release-${{ needs.gate.outputs.version }}
           path: ${{ runner.temp }}/out/
           if-no-files-found: error
+          retention-days: 14
 
+  # A separate job, so the write token never shares a machine with the build, and a failed upload can be re-run
+  # without rebuilding.
   publish:
-    needs: build
+    needs: [gate, quality, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.gate.outputs.version }}
       GH_REPO: ${{ github.repository }}
-      VERSION: ${{ needs.build.outputs.version }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     steps:
       # Full history and tags for the notes, without the tree.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -111,94 +142,110 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
-          sparse-checkout: /build/
+          sparse-checkout: |
+            /build/VERSION
+            /scripts/lib/
+            /.github/scripts/
           sparse-checkout-cone-mode: false
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: release-assets
-          path: out
+          name: release-${{ needs.gate.outputs.version }}
+          path: release
 
+      # Russian first, then English: the install command and the commits since the previous release tag
       - name: Write release notes
         run: |
-          tag="v$VERSION"
-          prev=$(git tag --list 'v*' --merged "$GITHUB_SHA" | { grep -vxF "$tag" || true; } | sort -V | tail -n1)
-          # Russian first, like every user-facing text of the project
-          {
-            echo "Shadow для OpenWrt $VERSION (OpenWrt 25.12 и новее). Установка и обновление — одна и та же команда на роутере, удаление — она же с \`--uninstall\`:"
-            echo
-            echo "Shadow for OpenWrt $VERSION (OpenWrt 25.12 and newer). Install or upgrade on the router with the same command, remove with \`--uninstall\`:"
-            echo
-            echo '```sh'
-            echo "sh <(wget -O - https://raw.githubusercontent.com/$GH_REPO/HEAD/install.sh)"
-            echo '```'
-            echo
-            echo "Подробнее: [README](https://github.com/$GH_REPO#readme) · Details: [README.en.md](https://github.com/$GH_REPO/blob/HEAD/README.en.md)"
-            echo
-            # the tag's message, when it is an annotated tag
-            if [ "$(git for-each-ref --format='%(objecttype)' "refs/tags/$tag")" = tag ]; then
-              git for-each-ref --format='%(contents)' "refs/tags/$tag"
-              echo
-            fi
-            echo "Изменения${prev:+ с $prev} / Changes${prev:+ since $prev}:"
-            echo
-            git log --no-merges --max-count=200 --pretty=format:'- %s' "${prev:+$prev..}$GITHUB_SHA"
-            echo
-          } > "$RUNNER_TEMP/notes.md"
+          bash .github/scripts/release-notes.sh > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
 
-      - name: Publish v${{ needs.build.outputs.version }}
+      - name: Publish ${{ needs.gate.outputs.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          tag="v$VERSION"
-          tag_sha=$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)
-          if [ -n "$tag_sha" ] && [ "$tag_sha" != "$GITHUB_SHA" ]; then
-            echo "::error::Tag $tag points at $tag_sha, not $GITHUB_SHA. Bump build/VERSION."
+          # Fresh state, not the gate's: this job may be a re-run days later.
+          state=$(bash .github/scripts/release-state.sh)
+          if [ "$state" = released ]; then
+            echo "::error::$VERSION has already been released by another run."
             exit 1
           fi
-          files=()
-          for f in $ASSETS; do files+=("out/$f"); done
-          if gh release view "$tag" >/dev/null 2>&1; then
-            # a re-run after a later step failed: the release must already hold these exact files
-            for f in $ASSETS; do
-              digest=$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq ".assets[] | select(.name == \"$f\") | .digest // \"-\"")
-              if [ "$digest" != "sha256:$(sha256sum "out/$f" | cut -d' ' -f1)" ]; then
-                echo "::error::Release $tag exists with a different $f. Bump build/VERSION."
-                exit 1
-              fi
-            done
-            echo "Release $tag already holds these files."
-            exit 0
-          fi
-          # Latest, unless a newer version is the latest already (install.sh would move routers back to this one).
-          current=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name 2>/dev/null || true)
-          current=${current#v}
-          latest=true
-          if [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$current" != "$VERSION" ] &&
-            [ "$(printf '%s\n%s\n' "$current" "$VERSION" | sort -V | tail -n 1)" = "$current" ]; then
-            echo "::warning::v$current is the latest release and newer than $VERSION: $tag is published without the latest mark."
-            latest=false
-          fi
-          # gh uploads the assets to a draft and publishes it after the last one, so the latest release never
-          # lacks a file install.sh downloads
-          gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --latest="$latest" \
-            --title "Shadow $VERSION для OpenWrt / for OpenWrt" --notes-file "$RUNNER_TEMP/notes.md"
 
-      - name: Check the uploads
-        run: |
-          tag="v$VERSION"
-          gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.assets[] | "\(.name) \(.state) \(.digest // "-")"' > "$RUNNER_TEMP/assets.txt"
+          # GITHUB_TOKEN cannot create a tag on a commit whose workflow files differ from the default branch's;
+          # the newer run of the default branch releases instead.
+          git fetch --quiet --no-tags origin "$DEFAULT_BRANCH"
+          if [ "$(git rev-parse "$GITHUB_SHA:.github/workflows")" != "$(git rev-parse FETCH_HEAD:.github/workflows)" ]; then
+            echo "::error::.github/workflows changed on $DEFAULT_BRANCH after this commit; the newer run of $DEFAULT_BRANCH will release $VERSION."
+            exit 1
+          fi
+
+          assets=()
           for f in $ASSETS; do
-            read -r _ state digest < <(awk -v n="$f" '$1 == n' "$RUNNER_TEMP/assets.txt") || true
-            if [ "${state:-}" != uploaded ]; then
-              echo "::error::$f on $tag is not uploaded."
+            assets+=("release/$f")
+          done
+
+          # Drafts have no tag yet. Any draft of this version is a leftover of a killed run, or this run's own
+          # one if it fails before publishing.
+          delete_drafts() {
+            gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | select(.draft and .tag_name == env.VERSION) | .id' \
+              | while read -r id; do gh api -X DELETE "repos/$GH_REPO/releases/$id" --silent; done
+          }
+          delete_drafts
+          trap '[ -n "${published:-}" ] || delete_drafts' EXIT
+
+          # Draft first: install.sh only sees the release once every asset is uploaded and checked. GitHub
+          # creates the lightweight tag on publish.
+          gh release create "$VERSION" "${assets[@]}" --draft \
+            --target "$GITHUB_SHA" \
+            --title "Shadow $VERSION для OpenWrt / for OpenWrt" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+
+          id=$(gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | select(.draft and .tag_name == env.VERSION) | .id')
+          if [ -z "$id" ] || [ "$(wc -l <<<"$id")" -ne 1 ]; then
+            echo "::error::Expected exactly one draft for $VERSION, got: $id"
+            exit 1
+          fi
+
+          gh api "repos/$GH_REPO/releases/$id" \
+            --jq '.assets[] | "\(.name) \(.size) \(.state) \(.digest // "-")"' > "$RUNNER_TEMP/uploaded.txt"
+          if [ "$(wc -l < "$RUNNER_TEMP/uploaded.txt")" -ne "${#assets[@]}" ]; then
+            echo "::error::The draft has $(wc -l < "$RUNNER_TEMP/uploaded.txt") assets instead of ${#assets[@]}."
+            exit 1
+          fi
+          for f in "${assets[@]}"; do
+            name=$(basename "$f")
+            size="" asset_state="" digest=""
+            read -r _ size asset_state digest < <(awk -v n="$name" '$1 == n' "$RUNNER_TEMP/uploaded.txt") || true
+            if [ "$size" != "$(wc -c < "$f" | tr -d ' ')" ] || [ "$asset_state" != uploaded ]; then
+              echo "::error::$name on the draft does not match the built file (size ${size:-?}, state ${asset_state:-?})."
               exit 1
             fi
-            if [ "${digest:-}" = "-" ]; then
-              echo "::warning::GitHub reported no digest for $f on $tag."
-            elif [ "${digest:-}" != "sha256:$(sha256sum "out/$f" | cut -d' ' -f1)" ]; then
-              echo "::error::$f on $tag differs from the built file."
+            if [ "$digest" = "-" ]; then
+              echo "::warning::GitHub reported no digest for $name."
+            elif [ "$digest" != "sha256:$(sha256sum "$f" | cut -d' ' -f1)" ]; then
+              echo "::error::$name on the draft has digest $digest, which differs from the built file."
               exit 1
             fi
           done
-          latest=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name 2>/dev/null || true)
-          echo "Published $tag: https://github.com/$GH_REPO/releases/tag/$tag (latest release: ${latest:-none})"
+
+          gh api -X PATCH "repos/$GH_REPO/releases/$id" -F draft=false -f make_latest=true --silent
+          published=1
+
+          latest=""
+          for _ in 1 2 3 4 5 6; do
+            latest=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name || true)
+            [ "$latest" = "$VERSION" ] && break
+            sleep 5
+          done
+          if [ "$latest" != "$VERSION" ]; then
+            echo "::error::/releases/latest returns \"$latest\" instead of $VERSION."
+            exit 1
+          fi
+          # The tag's commit as release-state.sh reads it: an annotated tag (one made by hand, which
+          # release-state.sh accepts as retry) is followed to its commit
+          . scripts/lib/version.sh
+          tag_sha=$(git ls-remote --tags origin | tag_commit "$VERSION")
+          if [ "$tag_sha" != "$GITHUB_SHA" ]; then
+            echo "::error::Tag $VERSION points at ${tag_sha:-nothing}, not $GITHUB_SHA."
+            exit 1
+          fi
+          echo "Released $VERSION: https://github.com/$GH_REPO/releases/tag/$VERSION"

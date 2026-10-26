@@ -10,6 +10,7 @@ one of them in the same change.
 ssh-vpn-client-luci-app-shadow-ucode/                              (repository root)
   install.sh                                    owner: packaging
   build/mk_apk.sh build/po2lmo.py build/VERSION owner: packaging
+  scripts/make-release.sh scripts/build-release.sh scripts/lib/version.sh   releases (DESIGN.md §11), owner: packaging
   shadow-vpn/
     control                                     package metadata (name, depends), owner: packaging
     files/etc/init.d/shadow-vpn                 owner: runtime
@@ -36,7 +37,9 @@ ssh-vpn-client-luci-app-shadow-ucode/                              (repository r
   tests/unit/<area>_test.uc, tests/unit/run.sh                     each owner writes its own *_test.uc
   tests/lab/                                                       Docker lab (see its README)
   tests/lab/e2e-shadow.sh                                          lab scenario checks, grouped by stage
+  tests/unit/release/*_test.sh, tests/unit/release/run.sh          the release scripts' tests (host bash + git)
   .github/workflows/ci.yml .github/workflows/release.yml           CI and releases (DESIGN.md §11, §12)
+  .github/scripts/release-state.sh .github/scripts/release-notes.sh   the release workflow's gate and notes
 ```
 
 Modules are ucode files imported as `import { x } from 'shadow-vpn.<name>';` (installed under
@@ -360,10 +363,15 @@ Additive fields beyond the table (the views rely on them; no field above is rena
   unreachable source and one with no release, fresh install, `apk del` on the factory world, a new latest release
   during the download, upgrade, downgrade, `--uninstall`, and at the end the latest release published on GitHub,
   installed by this install.sh the way a router does, or "no release is published yet" while there is none;
-  `PUBLISHED_RELEASE=skip` skips that part, release runs do). Like run.sh they copy sources and builds into their containers with tar, never through a bind
+  `PUBLISHED_RELEASE=skip` skips that part, a release run that publishes a new version does). Like run.sh they copy sources and builds into their containers with tar, never through a bind
   mount. `node tests/unit/luci/check_views.mjs` compiles the views as LuCI does, checks their msgids against the
   template and that every backend message translates through the Russian catalog.
+- `tests/unit/release/run.sh` runs the release scripts' tests on the host (bash 3.2+ and git, no Docker):
+  `make-release_test.sh`, `release-state_test.sh` (a curl stub for the GitHub API), `release-notes_test.sh`,
+  `assets_test.sh`; same `ok`/`not ok` output.
 - All of it runs on any arm64 Docker host (OrbStack on Apple Silicon, a Linux arm64 machine) and in CI
-  (`.github/workflows/ci.yml` on GitHub's `ubuntu-24.04-arm`: jobs `unit`, `host-docker` and `lab`), which
-  `.github/workflows/release.yml` also runs (`workflow_call`) on the commit it releases before it builds anything.
+  (`.github/workflows/ci.yml`: job `lint` on `ubuntu-24.04`, jobs `unit`, `host-docker` and `lab` on GitHub's
+  `ubuntu-24.04-arm`). On a
+  push to the default branch `.github/workflows/release.yml` runs that workflow (`workflow_call`) instead of
+  `ci.yml` itself, before it builds anything.
 - Every test is deterministic: no assertion races random jitter or a tight timer window.

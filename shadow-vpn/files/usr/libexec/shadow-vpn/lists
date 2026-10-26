@@ -1,0 +1,173 @@
+#!/usr/bin/ucode
+'use strict';
+
+// lists refresh <proxy|direct|due> (CONTRACTS §6, DESIGN §9). Prints one JSON object; exit 0 when every
+// refresh it ran succeeded. `due` is the hourly cron entry.
+
+import * as fs from 'fs';
+import { RUN, LOCK, LIBEXEC, NFT_TABLE, PORT_DNS, LIST_URLS } from 'shadow-vpn.const';
+import { parse, store, info, fetch } from 'shadow-vpn.lists';
+import { is_ipv4 } from 'shadow-vpn.validate';
+import { load as load_config } from 'shadow-vpn.config';
+import { attention_add, attention_dismiss, log, set_log_level } from 'shadow-vpn.state';
+
+const KINDS = [ 'proxy', 'direct' ];
+const DUE_SLACK = 600;        // cron runs hourly; a list stamped 23h59m ago is due at 24 h
+const STALE_INTERVALS = 3;    // a failing refresh is raised once the stored copy is this many intervals old
+const SSH_LOG_MAX = 262144;
+
+function uniq(list) {
+	let seen = {};
+
+	return filter(list, (v) => !seen[v] && (seen[v] = true));
+}
+
+// IPv4 answers of busybox nslookup; the server's own Address line comes before the first Name: line.
+function resolve4(host, server) {
+	let p = fs.popen(sprintf("nslookup -type=a '%s' '%s' 2>/dev/null", host, server), 'r');
+	let addrs = [], named = false;
+
+	if (!p)
+		return addrs;
+
+	for (let line = p.read('line'); line != null && line != ''; line = p.read('line')) {
+		if (match(line, /^Name:/))
+			named = true;
+
+		let m = named ? match(line, /^Address:[ \t]*([0-9.]+)[ \t]*$/) : null;
+
+		if (m && is_ipv4(m[1]))
+			push(addrs, m[1]);
+	}
+
+	p.close();
+
+	return addrs;
+}
+
+// uclient-fetch speaks neither SOCKS nor CONNECT, so the list host's addresses go into fetch4, which
+// the output chain marks into the tunnel. Both the router's answer (the one uclient-fetch connects to)
+// and the tunnel's are added; xray sniffs the TLS name, so the server dials the name either way.
+function fetch_via_tunnel(url) {
+	let host = match(url, /^https?:\/\/([A-Za-z0-9.-]+)[:\/]/)?.[1];
+	let addrs = host ? uniq([ ...resolve4(host, '127.0.0.1'), ...resolve4(host, `127.0.0.1:${PORT_DNS}`) ]) : [];
+
+	if (!length(addrs))
+		return { error: 'Routing list download failed: the list server name does not resolve.' };
+
+	if (system([ 'nft', 'add', 'element', 'inet', NFT_TABLE, 'fetch4', `{ ${join(', ', addrs)} }` ]) != 0)
+		return { error: 'Routing list download failed: the tunnel route could not be set up.' };
+
+	return fetch(url, { ipv4: true });
+}
+
+function refresh(kind) {
+	let url = LIST_URLS[kind], via = 'direct';
+	let r = fetch(url);
+
+	if (r.error && r.retry && fs.access(`${RUN}/active`)) {
+		via = 'tunnel';
+
+		let t = fetch_via_tunnel(url);
+
+		r = t.error ? { error: `${r.error} Through the tunnel: ${t.error}` } : t;
+	}
+
+	if (r.error)
+		return { kind, ok: false, via, error: r.error };
+
+	let parsed = parse(r.text, kind);
+
+	if (parsed.error)
+		return { kind, ok: false, via, error: parsed.error };
+
+	// apply and other refreshes read or write the stored lists under the same lock (DESIGN §6.1)
+	let lock = fs.open(LOCK, 'a');
+
+	lock?.lock('x');
+
+	let s = store(kind, parsed.domains);
+
+	lock?.close();
+
+	if (s.error)
+		return { kind, ok: false, via, error: s.error };
+
+	// the failure it reported is over (DESIGN §6.6: attention stays until its cause is gone)
+	attention_dismiss(`list_failed:${kind}`);
+
+	return { kind, ok: true, via, changed: s.changed, count: s.count };
+}
+
+// A failed refresh goes to the log, so "see the log" after a failed Refresh finds the reason; the hourly
+// one only at level info, as it fails every hour while GitHub is unreachable (note_failure raises it).
+function report(r, level) {
+	if (!r.ok)
+		log(level ?? 'warning', sprintf('The %s list was not refreshed: %s', r.kind, r.error));
+
+	return r;
+}
+
+// A failed hourly refresh is normal while GitHub is unreachable; the stored copy keeps routing. Only a
+// list that is missing or several intervals old is raised (one entry per list).
+function note_failure(kind, r, hours) {
+	let i = info(kind);
+
+	if (i.updated == null || time() - i.updated >= STALE_INTERVALS * hours * 3600)
+		attention_add('list_failed', r.error, { key: kind });
+}
+
+// DESIGN §8.2: the list cron also keeps the ssh logs bounded (ssh appends, so truncating is safe).
+function cap_ssh_logs() {
+	for (let path in fs.glob(`${RUN}/ssh.*.log`) ?? [])
+		if ((fs.stat(path)?.size ?? 0) > SSH_LOG_MAX)
+			fs.writefile(path, '');
+}
+
+function due() {
+	let model = load_config();
+	let hours = model?.main?.lists_refresh ?? 0;
+	let results = [];
+
+	cap_ssh_logs();
+
+	if (hours <= 0)
+		return results;
+
+	for (let kind in KINDS) {
+		if (!model?.lists?.[kind]?.enabled)
+			continue;
+
+		let i = info(kind);
+
+		if (i.updated != null && time() - i.updated < hours * 3600 - DUE_SLACK)
+			continue;
+
+		let r = report(refresh(kind), 'info');
+
+		if (!r.ok)
+			note_failure(kind, r, hours);
+
+		push(results, r);
+	}
+
+	return results;
+}
+
+let what = ARGV[1];
+
+if (ARGV[0] != 'refresh' || !(what == 'due' || what in KINDS)) {
+	warn('usage: lists refresh <proxy|direct|due>\n');
+	exit(2);
+}
+
+set_log_level(load_config()?.main?.log_level ?? 'warning');
+
+let results = (what == 'due') ? due() : [ report(refresh(what)) ];
+let ok = length(filter(results, (r) => !r.ok)) == 0;
+
+if (length(filter(results, (r) => r.changed)))
+	system(`${LIBEXEC}/job converge >/dev/null 2>&1`);
+
+print(sprintf('%J', (what == 'due') ? { ok, results } : results[0]), '\n');
+exit(ok ? 0 : 1);

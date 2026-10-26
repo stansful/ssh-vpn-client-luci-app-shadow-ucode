@@ -1,0 +1,4 @@
+#!/bin/sh
+# e2e stub of the runtime's gate-set: records each call.
+mkdir -p /tmp/e2e
+date +%s >> /tmp/e2e/gate-set.calls

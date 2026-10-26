@@ -1,0 +1,110 @@
+#!/bin/sh /etc/rc.common
+
+# After network (S20), firewall and dnsmasq (S19) and cron (S50).
+# No STOP: nothing needs undoing at power-off, tmpfs state goes away by itself.
+START=95
+USE_PROCD=1
+
+LIBEXEC=/usr/libexec/shadow-vpn
+RUN=/var/run/shadow-vpn
+LOCK=/var/lock/shadow-vpn.lock
+
+boot() {
+	SHADOW_BOOT=1 start "$@"
+}
+
+# The procd instances are declared from what apply rendered into $RUN: xray while active, plus ssh in
+# SSH mode. apply calls "start" with SHADOW_DECLARE=1 after every converge, outside its own lock, so a
+# converge that runs meanwhile can change RUN under this declaration. That is harmless: apply puts the
+# new files in place before it removes the old server's params, an ssh-run that finds its params gone
+# while RUN/ssh.sid names another server waits for its replacement (ssh.uc launch), and the converge's
+# own declaration follows.
+declare_instances() {
+	[ -e "$RUN/active" ] && [ -s "$RUN/xray.json" ] || return 0
+
+	local gen sid files sshgen
+	gen="$(cat "$RUN/gen" 2>/dev/null)"
+
+	procd_open_instance xray
+	procd_set_param command "$LIBEXEC/xray-run"
+	procd_set_param file "$RUN/xray.json"
+	procd_set_param env GOGC=50 GOMEMLIMIT=48MiB SHADOW_GEN="$gen"
+	procd_set_param respawn 3600 5 0
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+
+	sid="$(cat "$RUN/ssh.sid" 2>/dev/null)"
+	case "$sid" in
+		s_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+		*) return 0 ;;
+	esac
+	files="$(cat "$RUN/ssh.files" 2>/dev/null)"
+	# its own part of the generation changes with the server too (apply: ssh.gen), xray's does not
+	sshgen="$(cat "$RUN/ssh.gen" 2>/dev/null)"
+
+	procd_open_instance ssh
+	procd_set_param command "$LIBEXEC/ssh-run" "$sid"
+	procd_set_param file "$RUN/ssh.$sid.params" $files
+	procd_set_param env SSH_ASKPASS="$LIBEXEC/ssh-askpass" SSH_ASKPASS_REQUIRE=force SHADOW_ID="$sid" SHADOW_GEN="$gen.$sshgen"
+	procd_set_param respawn 120 2 0
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+# rc.common holds its procd lock on fd 1000 while an action runs (procd.sh procd_lock). Our helpers never get
+# it ("1000>&-"): busybox start-stop-daemon -b keeps fds above 2 open, so a detached job would inherit it,
+# keep /var/lock/procd_shadow-vpn.lock locked for as long as it lives, and every later /etc/init.d/shadow-vpn
+# action (procd's reload trigger included) would wait for it.
+start_service() {
+	[ -n "$SHADOW_DECLARE" ] || "$LIBEXEC/apply" converge --from-init ${SHADOW_BOOT:+--boot} 1000>&-
+	declare_instances
+}
+
+# restart = stop + start: tears down our data plane only; enabled stays as it is.
+stop_service() {
+	"$LIBEXEC/apply" teardown --from-init 1000>&-
+}
+
+# Never converge inside procd's trigger queue (one queue for the whole system): hand it to a job, or
+# leave "pending" for the converge that holds the lock right now.
+reload_service() {
+	if flock -n "$LOCK" true 2>/dev/null; then
+		"$LIBEXEC/job" converge >/dev/null 1000>&-
+	else
+		mkdir -p -m 0700 "$RUN"
+		touch "$RUN/pending"
+		flock -n "$LOCK" true 2>/dev/null && "$LIBEXEC/job" converge >/dev/null 1000>&-
+	fi
+	return 0
+}
+
+wan_networks() {
+	local found=""
+
+	wan_zone() {
+		local name network
+		config_get name "$1" name
+		[ "$name" = wan ] || return 0
+		config_get network "$1" network
+		found="$found $network"
+	}
+
+	config_load firewall
+	config_foreach wan_zone zone
+	echo "${found:-wan wan6}"
+}
+
+service_triggers() {
+	local net
+
+	procd_open_trigger
+	# dhcp: the dnsmasq instance, its confdir, max_ttl and upstreams feed our render (DESIGN.md 6.5);
+	# system: the NTP server names; firewall and network: the LAN zone's devices and networks
+	procd_add_reload_trigger shadow-vpn dhcp system firewall network
+	for net in $(wan_networks); do
+		procd_add_interface_trigger "interface.*.up" "$net" "$LIBEXEC/job" wan-up
+	done
+	procd_close_trigger
+}

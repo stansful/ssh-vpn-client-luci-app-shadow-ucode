@@ -1,0 +1,118 @@
+#!/bin/sh
+# gate-set [--locked] | --dry-run | --verdict <fallback> <listening 0|1> <down seconds> <fatal 0|1>
+#
+# Recomputes the nft gate (DESIGN.md 6.7). The gate holds "accept" in one case only: fallback mode
+# (kill_switch=0) while xray has been down for XRAY_DOWN_FALLBACK_SEC or has a fatal config error.
+# Then flows go direct and tunnelled names resolve through the normal upstream (the dnsmasq conf of that
+# verdict, installed by the converge this leaves "pending" for). Otherwise it is empty and divert's reject
+# rules make tunnelled connections fail fast.
+
+RUN=/var/run/shadow-vpn
+LOCK=/var/lock/shadow-vpn.lock
+TABLE="inet shadow_vpn"
+FALLBACK_SEC=10
+
+verdict() {
+	[ "$1" = direct ] || return 0
+	[ "$2" = 1 ] && return 0
+	if [ "$4" = 1 ] || [ "$3" -ge "$FALLBACK_SEC" ]; then
+		echo accept
+	fi
+}
+
+xray_listening() {
+	grep -qE '^ *[0-9]+: (0100007F|7F000001):3039 [0-9A-F]{8}:0000 0A ' /proc/net/tcp
+}
+
+current_verdict() {
+	local fallback listening=0 down=0 fatal=0 up since
+
+	fallback="$(cat "$RUN/fallback" 2>/dev/null)"
+	xray_listening && listening=1
+	[ -e "$RUN/xray.fatal" ] && fatal=1
+	if [ -s "$RUN/xray.down" ]; then
+		read -r up _ < /proc/uptime
+		read -r since < "$RUN/xray.down"
+		down=$(( ${up%.*} - ${since:-0} ))
+	fi
+	verdict "$fallback" "$listening" "$down" "$fatal"
+}
+
+same_file() {
+	[ -e "$1" ] && [ -e "$2" ] && [ "$(md5sum < "$1")" = "$(md5sum < "$2")" ]
+}
+
+# dnsmasq reads its conf only at start, so DNS follows the gate through a converge: it installs the conf of
+# the current verdict and post-start restarts dnsmasq with its liveness check (DESIGN.md 6.5). Here we only
+# leave "pending" for whoever holds the lock when the installed conf is not the one for the verdict.
+dns_follow() {
+	local want="$1" variant inst confdir
+
+	if [ "$want" = accept ]; then variant=dnsmasq.down.conf; else variant=dnsmasq.conf; fi
+	[ -s "$RUN/dnsmasq" ] && [ -s "$RUN/$variant" ] || return 0
+	read -r inst confdir < "$RUN/dnsmasq"
+	[ -d "$confdir" ] || return 0
+	same_file "$RUN/$variant" "$confdir/shadow-vpn.conf" && return 0
+	touch "$RUN/pending"
+}
+
+apply_verdict() {
+	local want="$1" variant
+
+	if [ "$want" = accept ]; then variant=table.accept.nft; else variant=table.open.nft; fi
+
+	if [ "$(cat "$RUN/gate" 2>/dev/null)" != "$want" ]; then
+		{
+			echo "flush chain $TABLE gate"
+			[ "$want" = accept ] && echo "add rule $TABLE gate accept"
+		} | nft -f - || return 1
+		echo "$want" > "$RUN/gate"
+		logger -t shadow-vpn -p daemon.warn "tunnel gate: ${want:-closed (reject while xray is down)}"
+	fi
+
+	# heals reload table.nft, so it always carries the current verdict
+	if [ -s "$RUN/$variant" ] && ! same_file "$RUN/$variant" "$RUN/table.nft"; then
+		cp "$RUN/$variant" "$RUN/table.nft.tmp" && mv "$RUN/table.nft.tmp" "$RUN/table.nft"
+	fi
+
+	dns_follow "$want"
+}
+
+case "$1" in
+	--verdict)
+		verdict "$2" "$3" "$4" "$5"
+		exit 0
+		;;
+	--dry-run)
+		current_verdict
+		exit 0
+		;;
+esac
+
+[ -e "$RUN/active" ] || exit 0
+
+if [ "$1" = --locked ]; then
+	apply_verdict "$(current_verdict)"
+	exit
+fi
+
+[ -d /var/lock ] || mkdir -p /var/lock
+exec 9>>"$LOCK" || exit 1
+if ! flock -n 9; then
+	# never wait (ssh-up runs us synchronously); bother the lock holder only when the verdict changes:
+	# it converges again, which runs gate-set
+	[ "$(current_verdict)" = "$(cat "$RUN/gate" 2>/dev/null)" ] && exit 0
+	touch "$RUN/pending"
+	flock -n 9 || exit 0
+fi
+[ -e "$RUN/active" ] || exit 0
+
+apply_verdict "$(current_verdict)"
+rc=$?
+
+# a hook left "pending" while we held the lock
+if [ -e "$RUN/pending" ]; then
+	flock -u 9
+	/usr/libexec/shadow-vpn/job converge >/dev/null 2>&1
+fi
+exit $rc

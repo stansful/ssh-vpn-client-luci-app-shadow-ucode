@@ -1,0 +1,27 @@
+config shadow 'main'
+	option enabled '1'
+	option transport 'xray'
+	option xray_profile 'p_0000000000a1'
+	option mode 'selected-rules'
+	option kill_switch '0'
+	option ipv6 '1'
+
+config list 'proxy'
+	option enabled '1'
+
+config list 'direct'
+	option enabled '0'
+
+config profile 'p_0000000000a1'
+	option name 'rt-reality'
+	option protocol 'vless'
+	option host '203.0.113.20'
+	option port '443'
+	option transport 'tcp'
+	option security 'reality'
+	option flow 'xtls-rprx-vision'
+
+config rule 'r_0000000000b1'
+	option type 'domain'
+	option value 'example.net'
+	option enabled '1'

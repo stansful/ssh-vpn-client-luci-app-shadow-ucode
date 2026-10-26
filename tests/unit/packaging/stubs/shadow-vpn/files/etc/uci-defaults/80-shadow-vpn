@@ -1,0 +1,9 @@
+#!/bin/sh
+# Test stub: creates /etc/config/shadow-vpn when missing.
+[ -s /etc/config/shadow-vpn ] || {
+	touch /etc/config/shadow-vpn
+	uci -q set shadow-vpn.main=shadow
+	uci -q set shadow-vpn.main.enabled=0
+	uci -q commit shadow-vpn
+}
+exit 0

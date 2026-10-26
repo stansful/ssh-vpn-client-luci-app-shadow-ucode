@@ -1,0 +1,8 @@
+#!/bin/sh
+# netifd flushes ip rules on its own restart and an lo flap drops our local route; a WAN DNS change
+# needs a re-render. fw4-hook does both without waiting for our lock.
+
+[ "$ACTION" = ifup ] || [ "$ACTION" = ifupdate ] || exit 0
+[ -e /var/run/shadow-vpn/active ] || exit 0
+
+/usr/libexec/shadow-vpn/fw4-hook --iface

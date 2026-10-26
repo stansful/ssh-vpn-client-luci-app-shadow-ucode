@@ -1,0 +1,2348 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:207
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:188
+msgid "Line %d: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:237
+msgid "%d s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:240
+msgid "%d min"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:243
+msgid "%d h %d min"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:245
+msgid "%d d %d h"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:255
+msgid "just now"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:255
+msgid "%s ago"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:260
+msgid "never"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:266
+msgid "today, %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:272
+msgid "%d MB"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:288
+#: htdocs/luci-static/resources/shadow-vpn/common.js:295
+msgid "unknown"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:293
+msgctxt "security"
+msgid "none"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:321
+msgid "The file is larger than %d KB."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:325
+msgid "Unable to read the file."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:409
+msgid "Close"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:463
+msgid "The action is still running in the background. Check the status in a moment."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:467
+msgid "The action failed. See the log for details."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:155
+msgid "Reconnect attempt %s failed: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:156
+msgid "SSH session lost (%s); reconnecting."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:157
+msgid "%s Through the tunnel: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:158
+msgid "Unsupported proxy transport: %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:159
+msgid "Unsupported Hysteria 2 obfuscation: %s. Only salamander works."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:160
+msgid "Unsupported Hysteria 2 finalmask type: %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:161
+msgid "Unsupported finalmask type for mKCP: %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:162
+msgid "Unsupported mKCP header type: %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:163
+msgid "Invalid %s URI."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:164
+msgid "%s URI must contain host and valid port."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:165
+msgid "Import text is longer than %s characters."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:166
+msgid "Import contains %s lines; maximum is %s. Extra lines were ignored."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:167
+msgid "proxy link is longer than %s bytes."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:168
+msgid "Proxy link is longer than %s characters."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:169
+msgid "Proxy profile count exceeds the %s profile limit."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:170
+msgid "CIDR prefix must be between 0 and %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:171
+msgid "Keepalive must be a whole number of seconds from %s to %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:172
+msgid "Routing rule count exceeds the %s rule limit."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:173
+msgid "Routing import is larger than %s bytes."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:174
+msgid "Routing import contains more than %s rules."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:175
+msgid "Domain proxy list is larger than %s entries."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:176
+msgid "Routing list download failed (uclient-fetch exit %s)."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:177
+msgid "%s routing rule(s) are invalid and were skipped."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:178
+msgid "%s is too long."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:179
+msgid "%s is required."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:180
+msgid "Connecting to %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:181
+msgid "Reconnecting to %s (attempt %s)."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:182
+msgid "Starting %s profile %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:183
+msgid "Xray rejected the configuration: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:184
+msgid "SSH TCP connect timeout for %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:185
+msgid "SSH keepalive timed out: nothing received from the server for %s s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:186
+msgid "SSH server fingerprint mismatch: expected %s, got %s (%s)."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:187
+msgid "SSH server host key does not match the key Shadow trusted on its first connection to %s: expected %s, got %s (%s). Shadow stopped so nothing is sent to a server that may be an impostor. If the server’s key was changed on purpose, paste the new fingerprint into the server’s Fingerprint field."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:189
+msgid "SSH authentication failed: Permission denied (%s)."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:190
+msgid "Local SOCKS port %s is already in use."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js:191
+msgid "SSH exited: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:31
+msgid "All events"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:31
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:59
+msgid "Warnings and errors"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:31
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:60
+msgid "Errors only"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:33
+msgid "Filter"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:38
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:55
+#: root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
+msgid "Logs"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:38
+msgid "Shadow, Xray and SSH events from the system log. Passwords, keys and links never get here."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:42
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:188
+msgid "Refresh"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:43
+msgid "Download"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:45
+msgctxt "log"
+msgid "Follow"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:82
+msgid "No log content."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:33
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:464
+msgid "Nothing to route through the tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:34
+msgid "SSH connection stopped"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:35
+msgid "Xray rejected the profile"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:36
+msgid "A port Shadow needs is busy"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:37
+msgid "DNS configuration rejected"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:40
+msgid "A domain list could not be updated"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:41
+msgid "Some rules were skipped"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:42
+msgid "Attention"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:70
+#: root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
+msgid "Shadow"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:70
+msgid "A tunnel through your own server over SSH or Xray, for every device on the network."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:73
+msgid "Tunnel check"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:74
+msgid "Opens a connection through the server and waits for the answer, so you can see that the tunnel really works and is not just connected."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:76
+msgid "Summary"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:125
+msgid "The server has not answered for %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:125
+msgid "The server does not answer."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:126
+msgid "Tunnelled sites are blocked until the tunnel is back."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:126
+msgid "Tunnelled sites go directly until the tunnel is back."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:130
+msgid "Shadow keeps reconnecting (attempt %d)."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:132
+msgid "No tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:132
+msgctxt "state"
+msgid "Direct"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:140
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:155
+msgid "Connecting…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:143
+msgid "Turning off…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:148
+msgctxt "state"
+msgid "Off"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:150
+msgid "Traffic goes directly."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:161
+msgctxt "state"
+msgid "Connected"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:168
+msgid "Reconnecting"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:169
+msgid "The connection to the server was lost %s ago. Attempt %d."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:175
+msgid "Server key changed"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:176
+msgid "Expected %s, the server showed %s (%s). This may be someone impersonating the server, so Shadow does not connect."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:179
+msgid "Error"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:180
+msgid "Retries stopped: fix the problem and connect again."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:183
+msgctxt "state"
+msgid "Not connected"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:184
+msgid "Shadow is on but not running. See the messages above."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:194
+msgid "Turn on"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:199
+msgid "Connect again"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:201
+msgid "Turn off"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:259
+msgid "No SSH servers yet."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:259
+msgid "No Xray profiles yet."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:266
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:206
+msgid "Transport"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:268
+msgid "SSH server"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:268
+msgid "Xray profile"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:271
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:366
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:130
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:326
+msgid "Edit"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:271
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:352
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:161
+msgid "Add"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:296
+msgid "Switching to the selected server: connections through the tunnel will reopen."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:297
+msgid "Server selected. It will be used when you turn Shadow on."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:311
+msgid "%d ms"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:312
+msgid "%s s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:316
+msgid "%s answered the TLS handshake in"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:318
+msgid "%s answered with a TLS alert: the tunnel carries data, but the endpoint refused the probe handshake."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:320
+msgid "%s answered: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:322
+msgid "%s answered with data that is not TLS: the tunnel carries data, but something other than the endpoint may be answering."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:324
+msgid "%s sent nothing: the tunnel opened the connection, but it could not be verified end to end."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:326
+msgid "The server could not open %s (%s)"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:328
+msgid "The tunnel opened a connection to %s but nothing came back within 12 s. Traffic is entering the tunnel and not reaching the server."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:330
+msgid "The check could not start through the local Xray: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:332
+msgid "The check failed."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:344
+msgid "Checking %s through the tunnel…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:347
+msgid "The check is available when the tunnel is connected."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:350
+msgid "Not checked yet."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:356
+msgid "Hysteria 2 runs over UDP (QUIC): the network may block UDP to the server or its ports, or the link’s password (auth), certificate pin (pinSHA256) or obfs password may be wrong."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:365
+msgid "Address:"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:367
+msgid "Check"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:390
+msgid "Check address"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:391
+msgid "Site and port separated by a colon, without https:// or a path. On ports 443 and 8443 Shadow starts a TLS handshake, on 80 and 8080 it sends an HTTP request."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:395
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:423
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:216
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:297
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:380
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:433
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:220
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:270
+msgid "Cancel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:396
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:217
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:381
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:223
+msgid "Save"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:404
+msgid "Check address saved."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:422
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:466
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:537
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:74
+#: root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
+msgid "Routing"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:426
+msgid "Open SSH"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:430
+msgid "Open Xray"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:443
+msgid "Dismiss"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:459
+msgid "Server fingerprint did not match"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:460
+msgid "If you reinstalled the server, open it on the SSH tab and press “Pin this key”. Otherwise do not connect: someone may be impersonating the server."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:461
+msgid "Open server"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:465
+msgid "In “Selected only” mode no list, rule or device is enabled, so Shadow will not turn on."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:500
+msgid "“%s”: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:500
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:17
+msgid "Blocked in Russia"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:501
+msgid "only your rules and devices"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:505
+msgid "except “%s” and the local network"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:505
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:17
+msgid "Russian services"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:506
+msgid "except the local network"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:537
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:115
+msgid "Selected only"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:537
+msgid "All traffic"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:538
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:87
+msgid "Own rules"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:538
+msgid "none"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:539
+msgid "Configure →"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:540
+msgid "Memory"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:541
+msgid "free %s of %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:545
+msgid "Browsers with their own secure DNS (DoH) bypass split routing: turn it off in the browser for listed sites to go through the tunnel."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:489
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:500
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:172
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:212
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:234
+msgid "%d domain"
+msgid_plural "%d domains"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:491
+msgid "%d IP"
+msgid_plural "%d IPs"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:493
+msgid "%d device"
+msgid_plural "%d devices"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:21
+msgid "to the tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:21
+msgid "bypassing the tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:25
+msgid "Domains"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:25
+msgid "IP addresses"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:25
+msgid "Devices"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:30
+msgid "A domain together with all its subdomains. On the router *.example.com includes example.com itself too."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:31
+msgid "An address or a subnet. The rule beats the local network: 10.8.0.0/16 opens the network behind the server."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:32
+msgid "All traffic of the device goes through the tunnel, except the local network. This replaces the app rules of the desktop app."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:40
+msgid "Choose a device or enter its MAC or IP address."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:74
+msgid "What goes through the tunnel and what goes directly. Changes apply at once, even while connected."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:75
+msgctxt "routing"
+msgid "Mode"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:76
+msgid "Domain lists"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:77
+msgid "Ready-made lists from"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:79
+msgid "instead of hundreds of your own rules. If a “Russian service” is also in the first list, it goes directly."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:83
+msgid "Refresh:"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:87
+msgid "Your rules beat the lists: a domain from a rule goes through the tunnel even if it is in “Russian services”."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:113
+msgid "All traffic through the tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:114
+msgid "Except the “Russian services” list, if it is on, and the local network. Sites from your rules also go through the tunnel."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:116
+msgid "Only the lists, domains, IP addresses and devices you chose go through the tunnel. Everything else goes directly."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:120
+msgid "There is nothing to route through the tunnel now: turn on a list or add a rule, otherwise Shadow will not turn on."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:137
+msgid "Mode saved."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:145
+msgid "manually only"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:145
+msgid "every 6 hours"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:145
+msgid "once a day"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:145
+msgid "once a week"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:148
+msgid "every %d hours"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:155
+msgid "Auto-refresh saved."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:172
+msgid "updated %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:173
+msgid "not downloaded yet"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:179
+msgid "In “All traffic” mode this list is not needed: the tunnel gets everything anyway."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:187
+msgid "View"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:189
+msgid "Use"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:204
+msgid "List “%s” is on."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:204
+msgid "List “%s” is off."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:212
+msgid "List “%s” updated: %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:220
+msgid "Find a domain"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:227
+msgid "Nothing found."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:227
+msgid "List is empty. Refresh it before viewing domains."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:260
+msgid "149.154.160.0/20 or 2001:db8::/32"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:262
+msgid "MAC or IP address"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:269
+msgid "Choose a device on the network…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:270
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:284
+msgid "unnamed"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:271
+msgid "Enter a MAC or IP address…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:291
+msgid "IPv6 is off"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:291
+msgid "IPv6 through the tunnel is off in Settings, so this rule does nothing."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:298
+msgid "Rule enabled."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:298
+msgid "Rule disabled."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:304
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:131
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:298
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:327
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:434
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:222
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:271
+msgid "Delete"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:305
+msgid "Rule deleted."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:333
+msgid "Rule added and already works."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:357
+msgid "No rules."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:359
+msgid "Import…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:360
+msgid "Export"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:361
+msgid "The format is compatible with desktop Shadow."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:384
+msgid "Skipped: %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:393
+msgid "Replace rules"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:419
+msgid "Import rules"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:420
+msgid "A shadow-routing-rules.json file from desktop Shadow or another router. The import replaces the current rules."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:372
+msgid "%d app rule (on the router, device rules replace them)"
+msgid_plural "%d app rules (on the router, device rules replace them)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:374
+msgid "%d rule of an unsupported type"
+msgid_plural "%d rules of an unsupported type"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:376
+msgid "%d invalid rule"
+msgid_plural "%d invalid rules"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:378
+msgid "%d duplicate"
+msgid_plural "%d duplicates"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:380
+msgid "%d entry that is not a rule"
+msgid_plural "%d entries that are not rules"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:383
+msgid "The file has %d rule: %d will be loaded."
+msgid_plural "The file has %d rules: %d will be loaded."
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:396
+msgid "Imported %d rule."
+msgid_plural "Imported %d rules."
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js:429
+msgid "Downloaded shadow-routing-rules.json (%d rule)."
+msgid_plural "Downloaded shadow-routing-rules.json (%d rules)."
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:27
+msgid "When the tunnel is down"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:29
+msgid "If the connection to the server is lost"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:30
+msgid "Block tunnelled traffic (kill switch)"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:31
+msgid "Let it go directly"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:33
+msgid "A dead tunnel is noticed in about 10 seconds. “Block”: sites that go through the tunnel do not open until it is back. “Directly”: they open without the tunnel until it is back."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:35
+msgid "Turn on when the router boots"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:36
+msgid "If Shadow was on, it turns on again after a reboot or a power cut."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:38
+msgid "Traffic"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:40
+msgid "UDP with the SSH tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:41
+msgid "Reject: QUIC falls back to TCP at once"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:42
+msgid "Let it go directly: only in “All traffic” mode"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:44
+msgid "SSH carries only TCP. Calls and games over UDP do not work through the SSH tunnel; Xray carries UDP."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:46
+msgid "DNS through the tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:47
+msgid "Addresses of tunnelled sites are resolved through the server (DoH), so the provider neither sees the requests nor alters the answers."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:48
+msgid "IPv6 through the tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:49
+msgid "Off: for tunnelled sites the router returns only IPv4 addresses, so IPv6 does not go around the tunnel."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:50
+msgid "Redirect LAN DNS to the router"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:51
+msgid "DNS requests from the network go to the router even if a device has its own DNS server, so the lists see every name. LAN servers the router itself uses for DNS (Pi-hole, AdGuard Home) are left alone. Turn it off if you run your own resolver."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:52
+msgid "Traffic of the router itself"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:53
+msgid "The router’s own connections (list updates, packages) to tunnelled sites also go through the tunnel."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:57
+msgid "Detail"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:58
+msgid "Detailed"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:67
+#: root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
+msgid "Settings"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:74
+msgid "About"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:77
+msgid "%s (from the OpenWrt feed)"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:79
+msgid "Update"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:71
+#: root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
+msgid "SSH"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:71
+msgid "Servers for the SSH tunnel and keys to log in to them. Passwords and keys are stored only on the router and never reach the log."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:72
+msgid "Servers"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:75
+msgid "Add server"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:78
+msgid "Keys"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:78
+msgid "Ed25519, ECDSA and RSA in OpenSSH, PEM or PKCS#8 format, including ones protected with a passphrase."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:81
+msgid "Add key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:98
+msgid "key changed"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:99
+msgid "the server showed %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:102
+msgid "✓ pinned"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:105
+msgid "trusted"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:106
+msgid "trusted since %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:109
+msgid "not checked"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:109
+msgid "remembered on the first connection"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:115
+msgid "No servers yet. Any server you log in to over SSH will do: nothing needs to be installed on it."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:121
+msgid "in use"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:126
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:144
+msgid "Key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:127
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:145
+msgid "Password"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:136
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:144
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:335
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:342
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:217
+msgid "Name"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:136
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:144
+msgid "Address"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:136
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:144
+msgid "Login"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:136
+msgid "Server key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:144
+msgid "Port"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:144
+msgid "User"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:145
+msgid "Server fingerprint"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:145
+msgid "Keep-alive check, s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:145
+msgid "Note"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:168
+msgid "For example, Hetzner, Helsinki"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:171
+msgid "vpn.example.com or IP"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:180
+msgid "With a password"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:181
+msgid "With a key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:188
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:353
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:358
+msgid "unchanged"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:189
+msgid "Leave empty to keep the saved password."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:196
+msgid "No keys yet: add one in the Keys section"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:202
+msgid "Optional. Empty: Shadow remembers the server key on the first connection and refuses to connect if it changes."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:204
+msgid "SSH server fingerprint must use the OpenSSH SHA256:base64 format (43 characters after SHA256:)."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:208
+msgid "How often to check that the server answers. A broken connection is noticed after about 3 such intervals."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:215
+msgid "Edit server"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:215
+msgid "New server"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:226
+msgid "Forget trusted key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:231
+msgid "The last connection saw this key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:234
+msgid "Pin this key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:240
+msgid "Trusted server key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:269
+msgid "Server saved. Changes apply on the next connection."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:269
+msgid "Server added."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:278
+msgid "Key pinned: Shadow will connect only to this server."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:287
+msgid "Trusted key forgotten: on the next connection Shadow remembers the new one."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:294
+msgid "Delete server"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:295
+msgid "Delete server “%s”? Its saved password is deleted too."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:301
+msgid "Server “%s” deleted."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:312
+msgid "No keys. Logging in with a password works too."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:319
+msgid "with passphrase"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:323
+msgid "not used"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:325
+msgid "Show"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:329
+msgid "The key is used by a server"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:335
+msgid "Type"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:335
+msgid "Used by"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:342
+msgid "Private key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:342
+msgid "Key passphrase"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:354
+msgid "Paste the contents of the file (for example ~/.ssh/id_ed25519), not the path to it. You can also load the file with the button below."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:358
+msgid "if the key is protected with a passphrase"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:375
+msgid "Edit key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:375
+msgid "New key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:377
+msgid "Load file…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:401
+msgid "%s format"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:404
+msgid "protected with a passphrase"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:407
+msgid "Key saved: %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:419
+msgid "Key “%s”"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:420
+msgid "This is a private key. Copy it and close the window; never show it to anyone."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:430
+msgid "Delete key"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:431
+msgid "Delete key “%s”?"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:437
+msgid "Key “%s” deleted."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:322
+msgid "%d server"
+msgid_plural "%d servers"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:20
+msgid "This profile uses an unsupported security mode."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:21
+msgid "This profile uses an unsupported or unrecognized Xray transport."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:43
+msgid "Search: name, protocol, address, transport"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:48
+#: root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
+msgid "Xray"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:48
+msgid "Xray profiles from share links. A link is a secret: it is stored only on the router and shown only on request."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:52
+msgid "Add link"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:53
+msgid "Import list"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:54
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:266
+msgid "Delete unpinned"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:68
+msgid "%d pinned"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:85
+msgid "not supported"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:88
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:214
+msgid "Certificate checks stay on"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:92
+msgid "Unpin"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:92
+msgid "Pin"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:100
+msgid "Selected"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:113
+msgid "selected"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:114
+msgid "Select"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:116
+msgid "More"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:124
+msgid "No profiles. Paste a link from your server:"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:127
+msgid "or"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:132
+msgid "Profile"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:132
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:204
+msgid "Protocol"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:146
+msgid "Profile “%s” selected."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:155
+msgid "One link per line. Empty lines and lines starting with # are skipped."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:159
+msgid "Import links"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:159
+msgid "New profile"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:161
+msgid "Import"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:174
+msgid "Xray profile saved."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:192
+msgid "Added %d, updated %d, skipped %d, failed %d."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:194
+msgid "…and %d more."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:205
+msgid "Server"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:207
+msgid "Added"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:211
+msgid "The profile is saved, but you cannot connect through it."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:215
+msgid "This profile’s link asks to skip certificate checks (insecure=1), which the bundled Xray can’t do, so the server’s certificate is checked as usual. If the server uses a self-signed certificate, add the link again with its pinSHA256 and remove this one."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:221
+msgid "Show link"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:226
+msgid "Profile renamed. The link does not change."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:239
+msgid "Link “%s”"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:240
+msgid "The link gives access to your server. Copy it and close the window."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:252
+msgid "Profile “%s” deleted."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:262
+msgid "There are no unpinned profiles to delete."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:68
+msgid "%d profile"
+msgid_plural "%d profiles"
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:267
+msgid "Delete %d unpinned profile? The selected profile is never deleted."
+msgid_plural "Delete %d unpinned profiles? The selected profile is never deleted."
+msgstr[0] ""
+msgstr[1] ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js:274
+msgid "Deleted %d unpinned profile."
+msgid_plural "Deleted %d unpinned profiles."
+msgstr[0] ""
+msgstr[1] ""
+
+#: root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
+msgid "Overview"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid arguments."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unable to start the background job."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Internal error. See the system log."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Select a private key."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Password is too long."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unable to store the password."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "No server key has been seen yet. Connect once, then pin the key."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unable to update the known hosts file."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH private key is too large."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Passphrase is too long."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "DSA keys can’t sign in. Use an Ed25519, ECDSA or RSA key."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unable to store the private key."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unable to store the passphrase."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unable to store the link."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Rule value is too long."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing rule does not exist."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The file is not valid JSON, so nothing was imported."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Tunnel check is available while the tunnel is connected."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Job not found."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid value."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unknown setting."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "This profile uses an unsupported security mode or transport, so it can't be selected."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Select or create an SSH configuration before connecting."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Select or import an Xray profile before connecting."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Selected rules mode requires at least one enabled routing rule or enabled proxy-list domain."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH configuration does not exist."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Proxy profile does not exist."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH key does not exist."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "This private key is used by at least one SSH configuration."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Secret record is missing."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Profile name is empty."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Import file must contain a rules array."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "This rule already exists."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Domain pattern is required."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Domain pattern is too long."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Domain pattern must include at least two labels."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Domain labels may contain letters, numbers, and internal hyphens."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "IP address or CIDR is required."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "CIDR may contain only one slash."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "IP address must be valid IPv4 or IPv6."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "CIDR prefix must be a number."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "CIDR prefix must not have leading zeros."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "CIDR prefix must be between 0 and 32."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "CIDR prefix must be between 0 and 128."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Endpoint is required. Use host:port."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Enter host:port without https:// or a path — for example youtube.com:443."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Endpoint must use host:port, for example youtube.com:443."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Endpoint must use host:port with a valid TCP port."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Name is required."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Name is too long."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Host is required."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Host is too long."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Username is required."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Username is too long."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Note is too long."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Enter only the server address in Host."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Enter only the user name in Username."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Enter a port from 1 to 65535."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Keepalive must be a whole number of seconds from 5 to 3600."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Keepalive must be a whole number of seconds from 60 to 3600."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH private key is empty."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH private key field contains a public key. Paste the private key contents instead."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH private key must start with a PRIVATE KEY PEM/OpenSSH header. Paste the key contents, not a file path."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Private key is required for a new key."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unable to load SSH private key because it is a security-key (FIDO) key, which signs only with its hardware key. Use an Ed25519, ECDSA or RSA key."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Only vless://, vmess://, trojan://, and hysteria2:// links are supported."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid VLESS URI."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid TROJAN URI."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "VLESS URI must contain host and valid port."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "TROJAN URI must contain host and valid port."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid VMess base64 JSON payload."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "VMess payload must contain add and valid port."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid Hysteria 2 link."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Hysteria 2 link must contain a server host."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Hysteria 2 link has an invalid port list."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Hysteria 2 salamander obfuscation needs obfs-password."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid Hysteria 2 ech: expected a base64 ECHConfigList."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid Hysteria 2 pinSHA256: expected a SHA-256 certificate hash."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid Hysteria 2 fm parameter: expected finalmask JSON."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid fm parameter: expected finalmask JSON."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The hysteria transport needs security=tls."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unsupported proxy URI protocol."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unsupported proxy security mode."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unsupported proxy transport: unknown."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Xray no longer runs the HTTP/2 transport (type=h2 or http). Ask your provider for an XHTTP link."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid URL"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "No valid Xray links were imported."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing proxy list refresh returned no domains."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH authentication failed: password auth rejected"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH authentication failed: private-key auth rejected"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH authentication failed: no auth method available."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH password is unavailable."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH private key is unavailable."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH authentication failed: Unable to load SSH private key because it is protected with a passphrase, and none was provided."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH authentication failed: Unable to load SSH private key because the passphrase is wrong."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH authentication failed: Unable to load SSH private key. Check the key format and passphrase."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH host key signature verification failed."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH transport closed."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH server disconnected."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Timed out waiting for SSH identification."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Socket closed before SSH identification."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Reconnect stopped. Update the SSH configuration or key, then connect again."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Reconnect stopped because SSH host trust or credentials require user action."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Tunnel check endpoint must be host:port."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH host key could not be checked because the host-key helper failed."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH host key verification failed."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH authentication failed: Unable to load SSH private key because its file is readable by other users."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH authentication failed: private-key auth rejected, or the key passphrase is wrong."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "No compatible SSH server host key algorithm."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "No compatible SSH kex algorithm."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "No compatible SSH client-to-server encryption algorithm."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "No compatible SSH client-to-server mac algorithm."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "No compatible SSH client-to-server compression algorithm."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Timed out waiting for SSH packet."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH exited without an error message."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH stopped after an error."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Nothing to route: turn on a domain list, add a rule, or switch to Proxy all."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The selected Xray profile has no usable outbound."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Enter a MAC address (aa:bb:cc:dd:ee:ff), an IP address or a CIDR."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "MAC address, IP address or CIDR is required."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid list."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing list download failed."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing list download failed: invalid URL."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing list download failed: the list server name does not resolve."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing list download failed: the tunnel route could not be set up."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing list download timed out."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing list is larger than the allowed limit."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing direct list refresh returned no domains."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "could not start the job"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Xray rejected the configuration."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Grant access to Shadow"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unable to load SSH private key. Check the key format and passphrase."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The key looks cut off — its -----END … PRIVATE KEY----- line is missing. Copy the whole file again."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:17
+msgid "Type hidden by encryption"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:42
+msgid "DNS lookups bypass the tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js:435
+msgid "DHCP and DNS"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "In full mode some DNS lookups go to %s directly: remove them in Network → DHCP and DNS or turn off DNS through the tunnel in Settings."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid pcs: expected a SHA-256 certificate hash."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "In full mode DNS lookups sent to %s go through the tunnel, so they fail while it is down. The VPN server name and the time servers go to %s instead."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "In full mode no DNS server outside the tunnel is set: the VPN server name is answered from its last known address, and the router clock cannot be set while the tunnel is down. Add a plain DNS server in Network → DHCP and DNS."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Select an SSH server first."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Select an Xray profile first."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH server settings are invalid."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH server settings are missing."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The link of the selected Xray profile is missing."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The link of the selected Xray profile is invalid."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "No enabled dnsmasq instance serves the LAN."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Could not render %s."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Could not write %s."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Xray runtime was not found at %s."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Could not write the nft transaction."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The firewall rejected Shadow's rules: %s"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "DNS configuration rejected: %s"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "DNS configuration rejected: dnsmasq did not start with Shadow's DNS file, so Shadow was turned off."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Port %s is already in use by %s."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Could not move the rendered files into place."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Could not add the policy routing rule for table 106."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Could not write Shadow's DNS file into %s."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Connected to %s."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "SSH session is not connected."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Xray transport is not connected."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Upstream SOCKS5 handshake timed out."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Upstream SOCKS5 proxy closed the connection during the handshake."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Upstream SOCKS5 proxy rejected the no-auth handshake."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Upstream SOCKS5 proxy returned an unsupported reply version."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Upstream SOCKS5 proxy refused %s with code %s."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Upstream SOCKS5 proxy returned an unsupported address type."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Hysteria 2 link must contain a password."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Trojan link must contain a password."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid Trojan password: expected percent-encoded UTF-8."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid REALITY public key (pbk): expected 43 base64url characters."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid REALITY short id (sid): expected up to 8 bytes in hex."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Unsupported VLESS encryption. Ask your provider for a current link."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Proxy server address is longer than 253 characters."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Proxy link has more than 128 parameters."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Invalid %s id: expected a UUID or up to 30 characters."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Username cannot start with - or contain any of these characters: ' ` \" ; & < > | ( ) { } $ \\ %"
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Sign-in method must be one of: password, key."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The selected SSH key no longer exists. Pick another key."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Routing %s list refresh returned no domains."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "Cannot write %s."
+msgstr ""
+
+#. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
+msgid "The server key changed since this page was loaded; review the new key."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "general server failure"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "not allowed by the server’s rules"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "network unreachable"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "host unreachable"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "connection refused"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "timed out"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "command not supported"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "address type not supported"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "Some DNS servers depend on the tunnel"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "The firewall rejected Shadow’s rules"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "Xray is restarting."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "Switching the transport: connections through the tunnel will reopen."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js
+msgid "Switch to Xray?"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js
+msgid "Shadow is on over SSH. Using profile “%s” switches the tunnel to Xray and reconnects it."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js
+msgid "Switch to Xray"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/xray.js
+msgid "Switching to profile “%s”: connections through the tunnel will reopen."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/routing.js
+msgid "The “Blocked in Russia” list is not downloaded yet. Shadow turns on anyway and downloads it through the tunnel; until then nothing goes through the tunnel."
+msgstr ""

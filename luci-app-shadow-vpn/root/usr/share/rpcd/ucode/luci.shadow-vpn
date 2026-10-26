@@ -1,0 +1,1579 @@
+'use strict';
+
+// rpcd object luci.shadow-vpn: fast reads and short writes for the Shadow LuCI app.
+// Anything that can take seconds runs as a detached `job` and returns { job }.
+
+import { readfile, open, popen, access, stat, unlink, rename } from 'fs';
+import { cursor } from 'uci';
+import { connect } from 'ubus';
+import * as socket from 'socket';
+
+import { UCI, ETC, RUN, LIBEXEC, PORT_METRICS, LIMITS } from 'shadow-vpn.const';
+import * as config from 'shadow-vpn.config';
+import * as secrets from 'shadow-vpn.secrets';
+import * as state from 'shadow-vpn.state';
+import * as links from 'shadow-vpn.links';
+import * as validate from 'shadow-vpn.validate';
+import * as lists from 'shadow-vpn.lists';
+import * as keys from 'shadow-vpn.keys';
+
+// Kept at module scope so the connection is not garbage collected between calls (see luci.upnp).
+const ubus = connect();
+
+const PREFIX = { server: 's', key: 'k', profile: 'p', rule: 'r' };
+const JOB_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+const ATTENTION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const FP_RE = /^SHA256:[A-Za-z0-9+\/]{43}$/;
+const MAC_RE = /^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$/;
+const LIST_KINDS = [ 'proxy', 'direct' ];
+const JOBS = { converge: [ '--connect' ], check: [], 'list-refresh': LIST_KINDS };
+const LOG_TAGS = [ 'shadow-vpn', 'xray', 'xray-run', 'ssh', 'ssh-run', 'ssh-openssh' ];
+const LOG_RE = /^\S+ \S+ +[0-9]+ [0-9:]+ [0-9]+ [a-z0-9]+\.[a-z]+ ([^:\[ ]+)(\[[0-9]+\])?: /;
+const MAX_IMPORT_ERRORS = 500;
+const UNSUPPORTED_PROFILE = "This profile uses an unsupported security mode or transport, so it can't be selected.";
+
+const RULE_CHECK = {
+	domain: validate.domain_rule,
+	ip: validate.ip_rule,
+	device: validate.device_rule
+};
+
+const SERVER_FIELDS = [ 'name', 'host', 'port', 'username', 'auth', 'key', 'fingerprint', 'keepalive', 'note' ];
+
+let version_cache = null;
+const list_cache = {};
+let model_cache = null;
+
+
+function open_cursor() {
+	const ctx = cursor();
+	ctx.load(UCI);
+	return ctx;
+}
+
+function valid_sid(sid, kind) {
+	return type(sid) == 'string' && secrets.valid_sid(sid) && substr(sid, 0, 1) == PREFIX[kind];
+}
+
+function find_by(items, sid) {
+	for (let item in items ?? [])
+		if (item.sid == sid)
+			return item;
+
+	return null;
+}
+
+function set_opt(ctx, sid, option, value) {
+	if (value == null || value == '')
+		ctx.delete(UCI, sid, option);
+	else
+		ctx.set(UCI, sid, option, '' + value);
+}
+
+function new_sid(ctx, kind) {
+	for (let i = 0; i < 8; i++) {
+		const sid = PREFIX[kind] + '_' + hexenc(readfile('/dev/urandom', 6));
+
+		if (!ctx.get(UCI, sid))
+			return sid;
+	}
+
+	die('unable to allocate a section id');
+}
+
+function new_uuid() {
+	const h = hexenc(readfile('/dev/urandom', 16));
+
+	// Version 4, RFC 4122 variant.
+	const v = substr(h, 0, 12) + '4' + substr(h, 13, 3) + substr('89ab', hex(substr(h, 16, 1)) % 4, 1) + substr(h, 17);
+
+	return sprintf('%s-%s-%s-%s-%s', substr(v, 0, 8), substr(v, 8, 4), substr(v, 12, 4), substr(v, 16, 4), substr(v, 20, 12));
+}
+
+function read_json(path) {
+	const text = readfile(path);
+
+	if (!text)
+		return null;
+
+	try {
+		return json(text);
+	}
+	catch (e) {
+		return null;
+	}
+}
+
+function write_private(path, data) {
+	const tmp = path + '.tmp';
+	const f = open(tmp, 'w', 0o600);
+
+	if (!f)
+		return false;
+
+	const written = f.write(data);
+	f.close();
+
+	if (written != length(data) || !rename(tmp, path)) {
+		unlink(tmp);
+		return false;
+	}
+
+	return true;
+}
+
+function now_ms() {
+	const c = clock(true);
+
+	return c[0] * 1000 + c[1] / 1000000;
+}
+
+function host_port(host, port) {
+	return (index(host, ':') >= 0) ? `[${host}]:${port}` : `${host}:${port}`;
+}
+
+// Only fixed job names and their known arguments ever reach the command line.
+function spawn_job(name, arg) {
+	if (!exists(JOBS, name) || (arg != null && !(arg in JOBS[name])))
+		die('invalid job');
+
+	const p = popen(sprintf('%s/job %s%s 2>/dev/null', LIBEXEC, name, arg ? ' ' + arg : ''), 'r');
+
+	if (!p)
+		return { error: 'Unable to start the background job.' };
+
+	const out = split(trim(p.read('all') ?? ''), '\n');
+	p.close();
+
+	const id = trim(out[length(out) - 1] ?? '');
+
+	return match(id, JOB_ID_RE) ? { job: id } : { error: 'Unable to start the background job.' };
+}
+
+// rpcd writes emit no config.change event, so every write is followed by a converge job.
+function changed() {
+	spawn_job('converge');
+}
+
+function selection_missing(model) {
+	const item = config.selected(model);
+
+	if (!item)
+		return (model.main.transport == 'ssh')
+			? 'Select or create an SSH configuration before connecting.'
+			: 'Select or import an Xray profile before connecting.';
+
+	if (model.main.transport == 'xray' && !item.supported)
+		return UNSUPPORTED_PROFILE;
+
+	return null;
+}
+
+function selection_problem(model) {
+	const missing = selection_missing(model);
+
+	if (missing)
+		return missing;
+
+	if (!config.targets(model))
+		return 'Selected rules mode requires at least one enabled routing rule or enabled proxy-list domain.';
+
+	return null;
+}
+
+// The first server or supported profile becomes the selection when the current one is gone.
+// Runs on a fresh cursor after the caller committed, so a reload inside config.load() loses nothing.
+function fix_selection() {
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+	const main = model.main;
+	let dirty = false;
+
+	if (!find_by(model.servers, main.ssh_server) && main.ssh_server != (model.servers[0]?.sid ?? null)) {
+		set_opt(ctx, 'main', 'ssh_server', model.servers[0]?.sid);
+		dirty = true;
+	}
+
+	const p = find_by(model.profiles, main.xray_profile);
+
+	if (!p || !p.supported) {
+		const first = filter(model.profiles, x => x.supported)[0]?.sid ?? null;
+
+		if (first != main.xray_profile) {
+			set_opt(ctx, 'main', 'xray_profile', first);
+			dirty = true;
+		}
+	}
+
+	if (dirty)
+		ctx.commit(UCI);
+}
+
+
+/* Host-key files written by ssh-hostkey (CONTRACTS §7) */
+
+function fields_of(path) {
+	const text = readfile(path);
+
+	return text ? split(trim(text), /[ \t\n]+/) : null;
+}
+
+function hostkey_problem(sid) {
+	const text = readfile(`${RUN}/hostkey.${sid}.status`);
+	const m = text ? match(trim(text), /^(changed|pin_mismatch) expected=(\S+) got=(\S+) type=(\S+)/) : null;
+
+	return m ? { kind: m[1], expected: m[2], got: m[3], type: m[4] } : null;
+}
+
+function hostkey_info(sid) {
+	const t = fields_of(`${ETC}/trusted.${sid}`);
+	const seen = fields_of(`${RUN}/hostkey.${sid}.seen`);
+
+	return {
+		trusted: (t && match(t[1], FP_RE)) ? { type: t[0], fingerprint: t[1], at: int(t[2] ?? 0) || null } : null,
+		seen: (seen && match(seen[1], FP_RE)) ? { type: seen[0], fingerprint: seen[1] } : null,
+		problem: hostkey_problem(sid)
+	};
+}
+
+/* Status */
+
+function instances() {
+	const res = ubus?.call('service', 'list', { name: 'shadow-vpn' });
+	const out = {};
+
+	for (let name, inst in res?.['shadow-vpn']?.instances ?? {})
+		out[name] = { running: !!inst.running, pid: inst.pid };
+
+	return out;
+}
+
+function rss_kb(inst) {
+	const pid = inst?.running ? inst.pid : null;
+	const text = (type(pid) == 'int' && pid > 0) ? readfile(`/proc/${pid}/status`) : null;
+	const m = text ? match(text, /VmRSS:[ \t]+([0-9]+) kB/) : null;
+
+	return m ? +m[1] : 0;
+}
+
+function memory(inst) {
+	const text = readfile('/proc/meminfo') ?? '';
+	const total = match(text, /MemTotal:[ \t]+([0-9]+)/);
+	const avail = match(text, /MemAvailable:[ \t]+([0-9]+)/);
+
+	return {
+		xray_kb: rss_kb(inst.xray),
+		ssh_kb: rss_kb(inst.ssh),
+		free_kb: avail ? +avail[1] : 0,
+		total_kb: total ? +total[1] : 0
+	};
+}
+
+// xray's own view of the tunnel: the observatory pings through `proxy` (DESIGN §6.7).
+function observation() {
+	const s = socket.connect('127.0.0.1', PORT_METRICS, null, 250);
+
+	if (!s)
+		return null;
+
+	s.send('GET /debug/vars HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n');
+
+	const deadline = now_ms() + 800;
+	let buf = '';
+
+	while (length(buf) < 1048576) {
+		const left = int(deadline - now_ms());
+
+		if (left <= 0)
+			break;
+
+		const ev = socket.poll(left, s);
+
+		if (!ev || !length(ev) || !ev[0][1])
+			break;
+
+		const chunk = s.recv(65536);
+
+		if (chunk == null || chunk == '')
+			break;
+
+		buf += chunk;
+	}
+
+	s.close();
+
+	const body = index(buf, '\r\n\r\n');
+
+	if (body < 0)
+		return null;
+
+	try {
+		return json(substr(buf, body + 4))?.observatory;
+	}
+	catch (e) {
+		return null;
+	}
+}
+
+function tunnel(main, active, inst) {
+	const res = { alive: null, fallback: main.kill_switch ? 'block' : 'direct', delay_ms: null, last_seen: null };
+
+	if (!active)
+		return res;
+
+	if (!inst.xray?.running) {
+		res.alive = false;
+		return res;
+	}
+
+	const proxy = observation()?.proxy;
+
+	if (proxy) {
+		res.alive = !!proxy.alive;
+		res.delay_ms = proxy.alive ? (proxy.delay ?? null) : null;
+		res.last_seen = proxy.last_seen_time ?? null;
+	}
+
+	return res;
+}
+
+function list_info(kind) {
+	const st = stat(`${ETC}/lists/${kind}.lst`);
+	const key = st ? `${st.mtime}:${st.size}` : '';
+
+	if (list_cache[kind]?.key !== key) {
+		let info = null;
+
+		try {
+			info = lists.info(kind);
+		}
+		catch (e) {
+			info = null;
+		}
+
+		list_cache[kind] = { key, info: { count: info?.count ?? 0, updated: info?.updated ?? null } };
+	}
+
+	return list_cache[kind].info;
+}
+
+function routing(model) {
+	const rules = { domain: 0, ip: 0, device: 0 };
+
+	for (let r in model.rules)
+		if (r.enabled && exists(rules, r.type))
+			rules[r.type]++;
+
+	const proxy = list_info('proxy'), direct = list_info('direct');
+
+	return {
+		mode: model.main.mode,
+		proxy: { enabled: model.lists.proxy.enabled, count: proxy.count, updated: proxy.updated },
+		direct: { enabled: model.lists.direct.enabled, count: direct.count, updated: direct.updated },
+		rules,
+		targets: !!config.targets(model)
+	};
+}
+
+function versions() {
+	const path = '/lib/apk/db/installed';
+	const st = stat(path);
+
+	if (version_cache && version_cache.mtime == st?.mtime)
+		return version_cache.versions;
+
+	const wanted = { 'shadow-vpn': 'shadow', 'xray-core': 'xray', 'openssh-client': 'openssh' };
+	const found = { shadow: null, xray: null, openssh: null };
+	const f = open(path, 'r');
+	let pkg = null;
+
+	if (f) {
+		for (let line = f.read('line'); length(line); line = f.read('line')) {
+			const tag = substr(line, 0, 2);
+
+			if (tag == 'P:')
+				pkg = wanted[trim(substr(line, 2))];
+			else if (tag == 'V:' && pkg) {
+				found[pkg] = trim(substr(line, 2));
+				pkg = null;
+			}
+		}
+
+		f.close();
+	}
+
+	version_cache = { mtime: st?.mtime, versions: found };
+
+	return found;
+}
+
+function target(model) {
+	const main = model.main;
+
+	if (main.transport == 'ssh') {
+		const s = find_by(model.servers, main.ssh_server);
+
+		return s ? { kind: 'ssh', name: s.name, addr: `${s.username}@${host_port(s.host, s.port)}` } : null;
+	}
+
+	const p = find_by(model.profiles, main.xray_profile);
+
+	return p ? { kind: 'xray', name: p.name, protocol: p.protocol, addr: host_port(p.host, p.hop_ports || p.port) } : null;
+}
+
+// The Overview polls status every 5 s, and a full validated load of a UCI file with thousands of rules
+// takes rpcd (one process for every LuCI call) a second or more on an A53. The model is kept until the
+// file or its uncommitted changes change: a uci commit writes a new file (another inode), a change of
+// the delta file shows in its size or mtime, and one minute bounds anything else.
+function file_key(path) {
+	const st = stat(path);
+
+	return st ? `${st.inode}:${st.mtime}:${st.size}` : '-';
+}
+
+function status_model() {
+	const key = file_key(`/etc/config/${UCI}`) + '|' + file_key(`/tmp/.uci/${UCI}`);
+
+	if (model_cache?.key !== key || time() - model_cache.at > 60)
+		model_cache = { key, at: time(), model: config.load(open_cursor()) };
+
+	return model_cache.model;
+}
+
+// Durations are worked out here, on one clock: `since` comes from the router's clock, which can be days
+// off until NTP sets it after a power cut (no battery clock), and the browser's clock is another one.
+function age_of(st) {
+	if (type(st?.since_up) == 'int')
+		return max(0, state.uptime() - st.since_up);
+
+	return (type(st?.since) == 'int' && st.since > 0) ? max(0, time() - st.since) : null;
+}
+
+function status() {
+	const model = status_model();
+	const main = model.main;
+	const st = state.read() ?? {};
+	const active = !!access(RUN + '/active');
+	const inst = instances();
+	const running = main.enabled || active;
+	const tun = tunnel(main, active, inst);
+	const chk = read_json(RUN + '/check.json');
+
+	if (tun.last_seen != null)
+		tun.last_seen_age = max(0, time() - tun.last_seen);
+
+	if (type(chk?.at) == 'int')
+		chk.age = max(0, time() - chk.at);
+
+	return {
+		enabled: main.enabled,
+		active,
+		phase: running ? (st.phase ?? 'disconnected') : 'disconnected',
+		since: running ? (st.since ?? null) : null,
+		age: running ? age_of(st) : null,
+		attempt: running ? (st.attempt ?? 0) : 0,
+		message: running ? (st.message ?? '') : '',
+		code: running ? (st.code ?? null) : null,
+		transport: main.transport,
+		target: target(model),
+		selected: { ssh_server: main.ssh_server, xray_profile: main.xray_profile },
+		mode: main.mode,
+		kill_switch: main.kill_switch,
+		check_endpoint: main.check_endpoint,
+		tunnel: tun,
+		xray_running: active ? !!inst.xray?.running : null,
+		check: chk,
+		hostkey: (main.transport == 'ssh' && main.ssh_server) ? hostkey_problem(main.ssh_server) : null,
+		attention: state.attention_list() ?? [],
+		routing: routing(model),
+		memory: memory(inst),
+		versions: versions()
+	};
+}
+
+function set_enabled(req) {
+	const on = req.args?.enabled;
+
+	if (type(on) != 'bool')
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+	let connect = false;
+
+	if (on) {
+		const problem = selection_problem(model);
+
+		if (problem)
+			return { error: problem };
+
+		// An explicit Connect is the only thing that clears a fatal stop (DESIGN §8.2); `converge --connect`
+		// clears it under the lock and restarts the instances. A plain re-converge does not.
+		connect = !model.main.enabled || access(RUN + '/fatal') || (state.read()?.phase == 'error');
+	}
+
+	ctx.set(UCI, 'main', 'enabled', on ? '1' : '0');
+	ctx.commit(UCI);
+
+	return spawn_job('converge', connect ? '--connect' : null);
+}
+
+function select(req) {
+	const a = req.args ?? {};
+
+	if (!(a.transport in [ 'ssh', 'xray' ]))
+		return { error: 'Invalid arguments.' };
+
+	const kind = (a.transport == 'ssh') ? 'server' : 'profile';
+	const option = (kind == 'server') ? 'ssh_server' : 'xray_profile';
+	const sid = a.sid ?? '';
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+
+	if (sid != '') {
+		if (!valid_sid(sid, kind))
+			return { error: 'Invalid arguments.' };
+
+		const item = find_by((kind == 'server') ? model.servers : model.profiles, sid);
+
+		if (!item)
+			return { error: (kind == 'server') ? 'SSH configuration does not exist.' : 'Proxy profile does not exist.' };
+
+		if (kind == 'profile' && !item.supported)
+			return { error: UNSUPPORTED_PROFILE };
+
+		ctx.set(UCI, 'main', option, sid);
+	}
+
+	// While Shadow is on, a switch to a transport with nothing usable selected would tear the running
+	// tunnel down (converge: no selection is Off): refuse it, like Turn on does.
+	if (model.main.enabled) {
+		const next = { ...model, main: { ...model.main, transport: a.transport } };
+
+		if (sid != '')
+			next.main[option] = sid;
+
+		const missing = selection_missing(next);
+
+		if (missing)
+			return { error: missing };
+	}
+
+	ctx.set(UCI, 'main', 'transport', a.transport);
+	ctx.commit(UCI);
+	changed();
+
+	return { ok: true };
+}
+
+
+/* SSH servers and host keys */
+
+function drop_known_host(sid) {
+	const path = ETC + '/known_hosts';
+	const text = readfile(path);
+
+	if (!text)
+		return true;
+
+	const prefix = `shadow-${sid} `;
+	const kept = filter(split(text, '\n'), l => l != '' && substr(l, 0, length(prefix)) != prefix);
+	const next = length(kept) ? join('\n', kept) + '\n' : '';
+
+	return (next == text) || write_private(path, next);
+}
+
+// Changing host, port or pin forgets the trusted key (desktop §8.8).
+function forget_hostkey(sid, also_seen) {
+	unlink(`${ETC}/trusted.${sid}`);
+	unlink(`${RUN}/hostkey.${sid}.status`);
+
+	if (also_seen)
+		unlink(`${RUN}/hostkey.${sid}.seen`);
+
+	return drop_known_host(sid);
+}
+
+function secret_exists(sid, kind) {
+	const path = secrets.path(sid, kind);
+
+	return !!(path && access(path));
+}
+
+function server_view(model, s) {
+	const key = s.key ? find_by(model.keys, s.key) : null;
+
+	return {
+		sid: s.sid, name: s.name, host: s.host, port: s.port, username: s.username, auth: s.auth,
+		key: s.key, key_name: key?.name ?? null, fingerprint: s.fingerprint, keepalive: s.keepalive, note: s.note,
+		has_password: secret_exists(s.sid, 'password'),
+		selected: model.main.ssh_server == s.sid,
+		hostkey: hostkey_info(s.sid)
+	};
+}
+
+function servers() {
+	const model = config.load(open_cursor());
+
+	return { servers: map(model.servers, s => server_view(model, s)) };
+}
+
+function server_save(req) {
+	const a = req.args ?? {};
+	const sid = a.sid ?? '';
+
+	if ((sid != '' && !valid_sid(sid, 'server')) || type(a.values) != 'object')
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+	const old = (sid != '') ? find_by(model.servers, sid) : null;
+
+	if (sid != '' && !old)
+		return { error: 'SSH configuration does not exist.' };
+
+	const fields = {};
+
+	for (let f in SERVER_FIELDS)
+		fields[f] = (a.values[f] == null) ? '' : ('' + a.values[f]);
+
+	const checked = validate.server(fields);
+
+	if (checked.errors)
+		return { errors: checked.errors };
+
+	const values = checked.values;
+
+	values.auth ??= fields.auth;
+	values.key ??= fields.key;
+
+	if (values.auth == 'key') {
+		if (!valid_sid(values.key, 'key') || !find_by(model.keys, values.key))
+			return { errors: { key: 'Select a private key.' } };
+	}
+	else {
+		values.key = '';
+	}
+
+	const password = a.password ?? '';
+
+	if (type(password) != 'string' || length(password) > 65536)
+		return { errors: { password: 'Password is too long.' } };
+
+	const id = (sid != '') ? sid : new_sid(ctx, 'server');
+
+	// The secret goes first: a failed write leaves no server that points at a missing password.
+	if (password != '' && !secrets.write(id, 'password', password))
+		return { error: 'Unable to store the password.' };
+
+	ctx.set(UCI, id, 'ssh_server');
+
+	for (let f in SERVER_FIELDS)
+		set_opt(ctx, id, f, values[f]);
+
+	if (old) {
+		const moved = (old.host != values.host || '' + old.port != '' + values.port);
+
+		if (moved || old.fingerprint != (values.fingerprint ?? ''))
+			forget_hostkey(id, moved);
+	}
+
+	ctx.commit(UCI);
+	fix_selection();
+	changed();
+
+	return { sid: id };
+}
+
+function server_delete(req) {
+	const sid = req.args?.sid;
+
+	if (!valid_sid(sid, 'server'))
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+
+	if (!find_by(config.load(ctx).servers, sid))
+		return { error: 'SSH configuration does not exist.' };
+
+	ctx.delete(UCI, sid);
+	ctx.commit(UCI);
+	fix_selection();
+	secrets.remove(sid);
+	forget_hostkey(sid, true);
+	changed();
+
+	return { ok: true };
+}
+
+// Pins the key the user was shown: the page passes that fingerprint, and a key seen since then (each
+// connect attempt records the key it met, an impostor's too) is not pinned in its place.
+function hostkey_pin(req) {
+	const sid = req.args?.sid, shown = req.args?.fingerprint;
+
+	if (!valid_sid(sid, 'server') || type(shown) != 'string' || !match(shown, FP_RE))
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+
+	if (!find_by(config.load(ctx).servers, sid))
+		return { error: 'SSH configuration does not exist.' };
+
+	const seen = hostkey_info(sid).seen;
+
+	if (!seen)
+		return { error: 'No server key has been seen yet. Connect once, then pin the key.' };
+
+	if (seen.fingerprint != shown)
+		return { error: 'The server key changed since this page was loaded; review the new key.' };
+
+	ctx.set(UCI, sid, 'fingerprint', seen.fingerprint);
+	ctx.commit(UCI);
+	forget_hostkey(sid, false);
+	changed();
+
+	return { ok: true, fingerprint: seen.fingerprint };
+}
+
+function hostkey_forget(req) {
+	const sid = req.args?.sid;
+
+	if (!valid_sid(sid, 'server'))
+		return { error: 'Invalid arguments.' };
+
+	if (!find_by(config.load(open_cursor()).servers, sid))
+		return { error: 'SSH configuration does not exist.' };
+
+	if (!forget_hostkey(sid, false))
+		return { error: 'Unable to update the known hosts file.' };
+
+	return { ok: true };
+}
+
+
+/* SSH keys */
+
+function key_users(model, sid) {
+	let n = 0;
+
+	for (let s in model.servers)
+		if (s.key == sid)
+			n++;
+
+	return n;
+}
+
+function keys_list() {
+	const model = config.load(open_cursor());
+
+	return {
+		keys: map(model.keys, k => ({
+			sid: k.sid, name: k.name, type: k.type, format: k.format, encrypted: k.encrypted,
+			used: key_users(model, k.sid),
+			has_passphrase: secret_exists(k.sid, 'passphrase')
+		}))
+	};
+}
+
+function key_save(req) {
+	const a = req.args ?? {};
+	const sid = a.sid ?? '';
+
+	if (sid != '' && !valid_sid(sid, 'key'))
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+	const old = (sid != '') ? find_by(model.keys, sid) : null;
+
+	if (sid != '' && !old)
+		return { error: 'SSH key does not exist.' };
+
+	// the length config.load() accepts, so a saved name is never shown as the sid instead
+	const name = validate.name(a.name ?? '', validate.ROUTER_NAME_LENGTH);
+
+	if (name.error)
+		return { errors: { name: name.error } };
+
+	const text = a.text ?? '';
+	const passphrase = a.passphrase ?? '';
+
+	if (type(text) != 'string' || type(passphrase) != 'string')
+		return { error: 'Invalid arguments.' };
+
+	if (!old && text == '')
+		return { errors: { text: 'Private key is required for a new key.' } };
+
+	if (length(text) > 65536)
+		return { errors: { text: 'SSH private key is too large.' } };
+
+	if (length(passphrase) > 65536)
+		return { errors: { passphrase: 'Passphrase is too long.' } };
+
+	let parsed = null;
+
+	if (text != '') {
+		parsed = keys.normalize(text);
+
+		if (parsed.error)
+			return { errors: { text: parsed.error } };
+
+		// keys.normalize already refuses DSA and sk- keys; these are its texts, kept as a backstop.
+		if (parsed.security_key)
+			return { errors: { text: 'Unable to load SSH private key because it is a security-key (FIDO) key, which signs only with its hardware key. Use an Ed25519, ECDSA or RSA key.' } };
+
+		if (parsed.type == 'dsa')
+			return { errors: { text: 'DSA keys can’t sign in. Use an Ed25519, ECDSA or RSA key.' } };
+
+		// An encrypted PKCS#8 key hides its algorithm ('unknown'); OpenSSH loads it without the type.
+		const unknown_ok = parsed.type == 'unknown' && parsed.format == 'pkcs8' && parsed.encrypted;
+
+		if (!(parsed.type in [ 'ed25519', 'ecdsa', 'rsa' ]) && !unknown_ok)
+			return { errors: { text: 'Unable to load SSH private key. Check the key format and passphrase.' } };
+	}
+
+	const id = old ? sid : new_sid(ctx, 'key');
+
+	if (parsed && !secrets.write(id, 'key', parsed.text))
+		return { error: 'Unable to store the private key.' };
+
+	if (passphrase != '' && !secrets.write(id, 'passphrase', passphrase))
+		return { error: 'Unable to store the passphrase.' };
+
+	ctx.set(UCI, id, 'ssh_key');
+	ctx.set(UCI, id, 'name', name.value);
+
+	if (parsed) {
+		ctx.set(UCI, id, 'type', parsed.type);
+		ctx.set(UCI, id, 'format', parsed.format);
+		ctx.set(UCI, id, 'encrypted', parsed.encrypted ? '1' : '0');
+	}
+
+	ctx.commit(UCI);
+	changed();
+
+	const k = parsed ?? old;
+
+	return { sid: id, key: { type: k.type, format: k.format, encrypted: !!k.encrypted } };
+}
+
+function key_delete(req) {
+	const sid = req.args?.sid;
+
+	if (!valid_sid(sid, 'key'))
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+
+	if (!find_by(model.keys, sid))
+		return { error: 'SSH key does not exist.' };
+
+	if (key_users(model, sid) > 0)
+		return { error: 'This private key is used by at least one SSH configuration.' };
+
+	ctx.delete(UCI, sid);
+	ctx.commit(UCI);
+	secrets.remove(sid);
+
+	return { ok: true };
+}
+
+function key_show(req) {
+	const sid = req.args?.sid;
+
+	if (!valid_sid(sid, 'key'))
+		return { error: 'Invalid arguments.' };
+
+	if (!find_by(config.load(open_cursor()).keys, sid))
+		return { error: 'SSH key does not exist.' };
+
+	const text = secrets.read(sid, 'key');
+
+	return text ? { text } : { error: 'Secret record is missing.' };
+}
+
+
+/* Xray profiles */
+
+function profiles() {
+	const model = config.load(open_cursor());
+
+	return {
+		profiles: map(model.profiles, p => ({
+			sid: p.sid, name: p.name, protocol: p.protocol, host: p.host, port: p.port, hop_ports: p.hop_ports,
+			transport: p.transport, security: p.security, flow: p.flow, pinned: p.pinned,
+			insecure_without_pin: p.insecure_without_pin, supported: p.supported,
+			created: p.created, updated: p.updated,
+			selected: model.main.xray_profile == p.sid
+		}))
+	};
+}
+
+function store_profile(ctx, id, p, old, keep_name, now) {
+	ctx.set(UCI, id, 'profile');
+	ctx.set(UCI, id, 'name', (old && keep_name) ? old.name : p.name);
+	ctx.set(UCI, id, 'protocol', p.protocol);
+	ctx.set(UCI, id, 'host', p.host);
+	ctx.set(UCI, id, 'port', '' + p.port);
+	set_opt(ctx, id, 'hop_ports', p.hop_ports);
+	ctx.set(UCI, id, 'transport', p.transport);
+	ctx.set(UCI, id, 'security', p.security);
+	set_opt(ctx, id, 'flow', p.flow);
+	ctx.set(UCI, id, 'fingerprint', p.identity);
+	ctx.set(UCI, id, 'insecure_without_pin', p.insecure_without_pin ? '1' : '0');
+	ctx.set(UCI, id, 'supported', p.supported ? '1' : '0');
+	ctx.set(UCI, id, 'pinned', old?.pinned ? '1' : '0');
+	ctx.set(UCI, id, 'created', '' + (old?.created || now));
+	ctx.set(UCI, id, 'updated', '' + now);
+}
+
+function profiles_import(req) {
+	const a = req.args ?? {};
+
+	if (type(a.text) != 'string')
+		return { error: 'Invalid arguments.' };
+
+	if (length(a.text) > LIMITS.import_chars)
+		return { error: sprintf('Import text is longer than %d characters.', LIMITS.import_chars) };
+
+	const keep_name = (a.source != 'manual');
+	const parsed = links.parse_import(a.text);
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+	const by_fp = {};
+	const now = time();
+	let count = length(model.profiles), added = 0, updated = 0, failed = 0;
+	const errors = [];
+
+	// UCI holds the keyed identity (secrets.profile_identity); a plain one of an earlier build is keyed here
+	// as well, and replaced when that profile is stored again
+	for (let p in model.profiles)
+		if (p.fingerprint)
+			by_fp[secrets.profile_identity(p.fingerprint) ?? p.fingerprint] = p;
+
+	// links.uc words its errors like the desktop ("Line 6: ..."); the line goes into its own field.
+	function fail(line, message) {
+		const m = match(message ?? '', /^Line [0-9]+: (.*)$/);
+
+		failed++;
+
+		if (length(errors) < MAX_IMPORT_ERRORS)
+			push(errors, { line: (line > 0) ? line : null, message: m ? m[1] : message });
+	}
+
+	for (let r in parsed?.results ?? []) {
+		if (!r.ok) {
+			fail(r.line, r.error);
+			continue;
+		}
+
+		// what config.load() would refuse must not become a section nobody can see or delete
+		const bad = validate.host(r.profile.host).error ?? validate.port(r.profile.port).error;
+
+		if (bad) {
+			fail(r.line, bad);
+			continue;
+		}
+
+		r.profile.identity = secrets.profile_identity(r.profile.fingerprint);
+
+		if (!r.profile.identity) {
+			fail(r.line, 'Unable to store the link.');
+			continue;
+		}
+
+		const old = by_fp[r.profile.identity];
+
+		if (!old && count >= LIMITS.profiles) {
+			fail(r.line, sprintf('Proxy profile count exceeds the %d profile limit.', LIMITS.profiles));
+			continue;
+		}
+
+		const id = old ? old.sid : new_sid(ctx, 'profile');
+
+		// The link is written before the profile that names it; one sync for all of them before the commit.
+		if (!secrets.write(id, 'link', r.link, { sync: false })) {
+			fail(r.line, 'Unable to store the link.');
+			continue;
+		}
+
+		store_profile(ctx, id, r.profile, old, keep_name, now);
+
+		if (old) {
+			updated++;
+		}
+		else {
+			added++;
+			count++;
+			by_fp[r.profile.identity] = { sid: id, name: r.profile.name, pinned: false, created: now };
+		}
+	}
+
+	if (added || updated) {
+		secrets.sync();
+		ctx.commit(UCI);
+		fix_selection();
+		changed();
+	}
+
+	return { added, updated, skipped: parsed?.skipped ?? 0, failed, errors };
+}
+
+function with_profile(req, fn) {
+	const sid = req.args?.sid;
+
+	if (!valid_sid(sid, 'profile'))
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+	const p = find_by(model.profiles, sid);
+
+	return p ? fn(ctx, model, p) : { error: 'Proxy profile does not exist.' };
+}
+
+function profile_rename(req) {
+	return with_profile(req, (ctx, model, p) => {
+		const name = links.normalize_name(type(req.args.name) == 'string' ? req.args.name : '');
+
+		if (name == '')
+			return { error: 'Profile name is empty.' };
+
+		// Only the name changes; the stored link is never rewritten.
+		ctx.set(UCI, p.sid, 'name', name);
+		ctx.commit(UCI);
+
+		return { ok: true, name };
+	});
+}
+
+function profile_pin(req) {
+	return with_profile(req, (ctx, model, p) => {
+		if (type(req.args.pinned) != 'bool')
+			return { error: 'Invalid arguments.' };
+
+		ctx.set(UCI, p.sid, 'pinned', req.args.pinned ? '1' : '0');
+		ctx.commit(UCI);
+
+		return { ok: true };
+	});
+}
+
+function profile_delete(req) {
+	return with_profile(req, (ctx, model, p) => {
+		ctx.delete(UCI, p.sid);
+		ctx.commit(UCI);
+		fix_selection();
+		secrets.remove(p.sid);
+		changed();
+
+		return { ok: true };
+	});
+}
+
+function profiles_delete_unpinned() {
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+	const gone = [];
+
+	for (let p in model.profiles) {
+		// The selected profile is never deleted.
+		if (!p.pinned && p.sid != model.main.xray_profile) {
+			ctx.delete(UCI, p.sid);
+			push(gone, p.sid);
+		}
+	}
+
+	if (length(gone)) {
+		ctx.commit(UCI);
+		fix_selection();
+
+		for (let sid in gone)
+			secrets.remove(sid);
+
+		changed();
+	}
+
+	return { ok: true, deleted: length(gone) };
+}
+
+function profile_link(req) {
+	return with_profile(req, (ctx, model, p) => {
+		const link = secrets.read(p.sid, 'link');
+
+		return link ? { link } : { error: 'Secret record is missing.' };
+	});
+}
+
+
+/* Domain lists */
+
+function lists_view() {
+	const model = config.load(open_cursor());
+	const out = {};
+
+	for (let kind in LIST_KINDS) {
+		const info = list_info(kind);
+		out[kind] = { enabled: model.lists[kind].enabled, count: info.count, updated: info.updated };
+	}
+
+	return out;
+}
+
+function list_set(req) {
+	const a = req.args ?? {};
+
+	if (!(a.kind in LIST_KINDS) || type(a.enabled) != 'bool')
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+
+	ctx.set(UCI, a.kind, 'list');
+	ctx.set(UCI, a.kind, 'enabled', a.enabled ? '1' : '0');
+	ctx.commit(UCI);
+
+	// "Use" downloads a list that was never fetched; the refresh job converges itself when the list changes.
+	if (a.enabled && !list_info(a.kind).count)
+		return spawn_job('list-refresh', a.kind);
+
+	return spawn_job('converge');
+}
+
+function list_refresh(req) {
+	const kind = req.args?.kind;
+
+	if (!(kind in LIST_KINDS))
+		return { error: 'Invalid arguments.' };
+
+	return spawn_job('list-refresh', kind);
+}
+
+function list_view(req) {
+	const kind = req.args?.kind;
+
+	if (!(kind in LIST_KINDS))
+		return { error: 'Invalid arguments.' };
+
+	return { domains: lists.load(kind) ?? [] };
+}
+
+
+/* Rules */
+
+function rules() {
+	const model = config.load(open_cursor());
+
+	return {
+		rules: map(model.rules, r => ({ sid: r.sid, id: r.id, type: r.type, value: r.value, enabled: r.enabled }))
+	};
+}
+
+function store_rule(ctx, sid, id, rtype, value, enabled) {
+	ctx.set(UCI, sid, 'rule');
+	ctx.set(UCI, sid, 'id', id);
+	ctx.set(UCI, sid, 'type', rtype);
+	ctx.set(UCI, sid, 'value', value);
+	ctx.set(UCI, sid, 'enabled', enabled ? '1' : '0');
+}
+
+function rule_add(req) {
+	const a = req.args ?? {};
+
+	if (!exists(RULE_CHECK, a.type) || type(a.value) != 'string')
+		return { error: 'Invalid arguments.' };
+
+	if (length(a.value) > 1024)
+		return { error: 'Rule value is too long.' };
+
+	const checked = RULE_CHECK[a.type](a.value);
+
+	if (checked.error)
+		return { error: checked.error };
+
+	const ctx = open_cursor();
+	const model = config.load(ctx);
+
+	if (length(model.rules) >= LIMITS.rules)
+		return { error: sprintf('Routing rule count exceeds the %d rule limit.', LIMITS.rules) };
+
+	for (let r in model.rules)
+		if (r.type == a.type && lc(r.value) == lc(checked.value))
+			return { error: 'This rule already exists.' };
+
+	const sid = new_sid(ctx, 'rule');
+
+	store_rule(ctx, sid, new_uuid(), a.type, checked.value, true);
+	ctx.commit(UCI);
+	changed();
+
+	return { sid, value: checked.value };
+}
+
+function with_rule(req, fn) {
+	const sid = req.args?.sid;
+
+	if (!valid_sid(sid, 'rule'))
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+
+	if (ctx.get(UCI, sid) != 'rule')
+		return { error: 'Routing rule does not exist.' };
+
+	const res = fn(ctx, sid);
+
+	if (!res.error) {
+		ctx.commit(UCI);
+		changed();
+	}
+
+	return res;
+}
+
+function rule_set(req) {
+	return with_rule(req, (ctx, sid) => {
+		if (type(req.args.enabled) != 'bool')
+			return { error: 'Invalid arguments.' };
+
+		ctx.set(UCI, sid, 'enabled', req.args.enabled ? '1' : '0');
+
+		return { ok: true };
+	});
+}
+
+function rule_delete(req) {
+	return with_rule(req, (ctx, sid) => {
+		ctx.delete(UCI, sid);
+
+		return { ok: true };
+	});
+}
+
+// Earlier desktop versions saved zero-padded prefixes ("/08"); import rewrites them (desktop canonicalIpRuleValue).
+function canonical_ip(value) {
+	const m = match(trim(value), /^(.*)\/(0[0-9]+)$/);
+
+	return m ? `${m[1]}/${int(m[2])}` : value;
+}
+
+function rules_import(req) {
+	const a = req.args ?? {};
+
+	if (type(a.text) != 'string' || type(a.apply) != 'bool')
+		return { error: 'Invalid arguments.' };
+
+	if (length(a.text) > LIMITS.import_chars)
+		return { error: sprintf('Routing import is larger than %d bytes.', LIMITS.import_chars) };
+
+	let text = a.text, data;
+
+	if (substr(text, 0, 3) == '\xef\xbb\xbf')
+		text = substr(text, 3);
+
+	try {
+		data = json(text);
+	}
+	catch (e) {
+		return { error: 'The file is not valid JSON, so nothing was imported.' };
+	}
+
+	const items = (type(data) == 'array') ? data : (type(data?.rules) == 'array' ? data.rules : null);
+
+	if (!items)
+		return { error: 'Import file must contain a rules array.' };
+
+	if (length(items) > LIMITS.rules)
+		return { error: sprintf('Routing import contains more than %d rules.', LIMITS.rules) };
+
+	const skipped = { unsupported: 0, invalid: 0, duplicates: 0, malformed: 0, apps: 0 };
+	const seen = {}, ids = {}, out = [];
+
+	for (let e in items) {
+		if (type(e) != 'object' || type(e.type) != 'string') {
+			skipped.malformed++;
+			continue;
+		}
+
+		// Desktop process rules have no router equivalent; device rules replace them.
+		if (e.type == 'process.name') {
+			skipped.unsupported++;
+			skipped.apps++;
+			continue;
+		}
+
+		if (!exists(RULE_CHECK, e.type)) {
+			skipped.unsupported++;
+			continue;
+		}
+
+		const checked = (type(e.value) == 'string')
+			? RULE_CHECK[e.type]((e.type == 'ip') ? canonical_ip(e.value) : e.value)
+			: { error: 'invalid' };
+
+		if (checked.error) {
+			skipped.invalid++;
+			continue;
+		}
+
+		const dedupe = e.type + '\n' + lc(checked.value);
+
+		if (seen[dedupe]) {
+			skipped.duplicates++;
+			continue;
+		}
+
+		seen[dedupe] = true;
+
+		let id = (type(e.id) == 'string') ? lc(trim(e.id)) : '';
+
+		if (!match(id, UUID_RE) || ids[id])
+			id = new_uuid();
+
+		ids[id] = true;
+		push(out, { id, type: e.type, value: checked.value, enabled: (type(e.enabled) == 'bool') ? e.enabled : true });
+	}
+
+	if (a.apply) {
+		const ctx = open_cursor();
+		const old = [];
+
+		ctx.foreach(UCI, 'rule', s => { push(old, s['.name']); });
+
+		for (let name in old)
+			ctx.delete(UCI, name);
+
+		for (let r in out)
+			store_rule(ctx, new_sid(ctx, 'rule'), r.id, r.type, r.value, r.enabled);
+
+		ctx.commit(UCI);
+		changed();
+	}
+
+	return { total: length(items), imported: length(out), skipped };
+}
+
+function rules_export() {
+	const model = config.load(open_cursor());
+	const out = map(model.rules, r => ({ id: r.id, type: r.type, value: r.value, enabled: r.enabled }));
+
+	return { json: sprintf('%.2J', out) + '\n' };
+}
+
+
+/* Devices, checks, jobs, logs, attention, settings */
+
+function leases() {
+	const out = [], seen = {};
+	const f = open('/tmp/dhcp.leases', 'r');
+
+	if (f) {
+		for (let line = f.read('line'); length(line) && length(out) < 1000; line = f.read('line')) {
+			const p = split(trim(line), ' ');
+
+			if (length(p) < 4 || !match(p[1], MAC_RE))
+				continue;
+
+			const mac = uc(p[1]);
+
+			if (seen[mac])
+				continue;
+
+			seen[mac] = true;
+			push(out, { name: (p[3] == '*') ? '' : p[3], ip: p[2], mac });
+		}
+
+		f.close();
+	}
+
+	return { leases: out };
+}
+
+function check() {
+	if (!access(RUN + '/active'))
+		return { error: 'Tunnel check is available while the tunnel is connected.' };
+
+	return spawn_job('check');
+}
+
+function job_status(req) {
+	const id = req.args?.id;
+
+	if (type(id) != 'string' || !match(id, JOB_ID_RE))
+		return { error: 'Invalid arguments.' };
+
+	return state.job_read(id) ?? { error: 'Job not found.' };
+}
+
+// Defence in depth: the same patterns as the desktop redactSecrets, plus the xray echoes named in DESIGN §5.
+function redact(line) {
+	line = replace(line, /"([A-Za-z0-9_-]*password|auth)"[ \t]*:[ \t]*"([^"\\]|\\.)*"/gi, '"$1":"<redacted>"');
+	line = replace(line, /([a-z0-9+.-]:\/\/)[^ \t\/?#@]+@/gi, '$1<redacted>@');
+	line = replace(line, /(invalid UUID:|invalid "password":|"shortId":)[ \t]*[^ \t,}]+/gi, '$1 <redacted>');
+	line = replace(line, /(password|passphrase|private key|proxy uri|uri)[ \t]*[:=][ \t]*[^ \t]+/gi, '$1=<redacted>');
+
+	return line;
+}
+
+function logs(req) {
+	const n = req.args?.lines;
+	const want = (type(n) == 'int' && n > 0) ? min(n, 1000) : 300;
+	const out = [];
+
+	// Constant arguments only; tags are filtered here and level/text in the browser.
+	const p = popen('/sbin/logread -l 3000 2>/dev/null', 'r');
+
+	if (p) {
+		for (let line = p.read('line'); length(line); line = p.read('line')) {
+			const m = match(line, LOG_RE);
+
+			if (m && m[1] in LOG_TAGS) {
+				push(out, redact(rtrim(line, '\n')));
+
+				if (length(out) > want)
+					shift(out);
+			}
+		}
+
+		p.close();
+	}
+
+	return { lines: out };
+}
+
+function attention_dismiss(req) {
+	const id = req.args?.id;
+
+	if (type(id) != 'string' || !match(id, ATTENTION_ID_RE))
+		return { error: 'Invalid arguments.' };
+
+	state.attention_dismiss(id);
+
+	return { ok: true };
+}
+
+// Settings that live outside the Settings form (Overview endpoint, Routing mode and auto-refresh).
+function settings_set(req) {
+	const values = req.args?.values;
+
+	if (type(values) != 'object')
+		return { error: 'Invalid arguments.' };
+
+	const ctx = open_cursor();
+	const errors = {};
+	let routing_changed = false, n = 0;
+
+	for (let k, v in values) {
+		n++;
+
+		if (type(v) != 'string') {
+			errors[k] = 'Invalid value.';
+		}
+		else if (k == 'mode') {
+			if (!(v in [ 'proxy-all', 'selected-rules' ]))
+				errors[k] = 'Invalid value.';
+			else {
+				ctx.set(UCI, 'main', 'mode', v);
+				routing_changed = true;
+			}
+		}
+		else if (k == 'check_endpoint') {
+			const checked = validate.endpoint(v);
+
+			if (checked.error)
+				errors[k] = checked.error;
+			else
+				ctx.set(UCI, 'main', 'check_endpoint', checked.value);
+		}
+		else if (k == 'lists_refresh') {
+			if (!match(v, /^(0|[1-9][0-9]{0,3})$/) || int(v) > 8760)
+				errors[k] = 'Invalid value.';
+			else
+				ctx.set(UCI, 'main', 'lists_refresh', v);
+		}
+		else {
+			errors[k] = 'Unknown setting.';
+		}
+	}
+
+	if (length(errors))
+		return { errors };
+
+	if (n) {
+		ctx.commit(UCI);
+
+		if (routing_changed)
+			changed();
+	}
+
+	return { ok: true };
+}
+
+
+function method(args, fn) {
+	return {
+		args,
+		call: function(req) {
+			try {
+				return fn(req);
+			}
+			catch (e) {
+				const where = e.stacktrace?.[0]?.function ?? '?';
+
+				system([ '/usr/bin/logger', '-t', 'shadow-vpn', '-p', 'daemon.err',
+					substr(redact(sprintf('luci.shadow-vpn %s: %s', where, e)), 0, 300) ]);
+
+				return { error: 'Internal error. See the system log.' };
+			}
+		}
+	};
+}
+
+const SID = { sid: 'sid' };
+
+return {
+	'luci.shadow-vpn': {
+		status: method({}, status),
+		set_enabled: method({ enabled: true }, set_enabled),
+		select: method({ transport: 'transport', sid: 'sid' }, select),
+
+		servers: method({}, servers),
+		server_save: method({ sid: 'sid', values: {}, password: 'password' }, server_save),
+		server_delete: method(SID, server_delete),
+		hostkey_pin: method({ sid: 'sid', fingerprint: 'fingerprint' }, hostkey_pin),
+		hostkey_forget: method(SID, hostkey_forget),
+
+		keys: method({}, keys_list),
+		key_save: method({ sid: 'sid', name: 'name', text: 'text', passphrase: 'passphrase' }, key_save),
+		key_delete: method(SID, key_delete),
+		key_show: method(SID, key_show),
+
+		profiles: method({}, profiles),
+		profiles_import: method({ text: 'text', source: 'source' }, profiles_import),
+		profile_rename: method({ sid: 'sid', name: 'name' }, profile_rename),
+		profile_pin: method({ sid: 'sid', pinned: true }, profile_pin),
+		profile_delete: method(SID, profile_delete),
+		profiles_delete_unpinned: method({}, profiles_delete_unpinned),
+		profile_link: method(SID, profile_link),
+
+		lists: method({}, lists_view),
+		list_set: method({ kind: 'kind', enabled: true }, list_set),
+		list_refresh: method({ kind: 'kind' }, list_refresh),
+		list_view: method({ kind: 'kind' }, list_view),
+
+		rules: method({}, rules),
+		rule_add: method({ type: 'type', value: 'value' }, rule_add),
+		rule_set: method({ sid: 'sid', enabled: true }, rule_set),
+		rule_delete: method(SID, rule_delete),
+		rules_import: method({ text: 'text', apply: true }, rules_import),
+		rules_export: method({}, rules_export),
+
+		leases: method({}, leases),
+		check: method({}, check),
+		job_status: method({ id: 'id' }, job_status),
+		logs: method({ lines: 300 }, logs),
+		attention_dismiss: method({ id: 'id' }, attention_dismiss),
+		settings_set: method({ values: {} }, settings_set)
+	}
+};

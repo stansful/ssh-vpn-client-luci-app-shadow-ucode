@@ -1,0 +1,31 @@
+config shadow 'main'
+	option enabled '1'
+	option transport 'ssh'
+	option ssh_server 's_0000000000a1'
+	option mode 'proxy-all'
+	option kill_switch '1'
+
+config list 'proxy'
+	option enabled '0'
+
+config list 'direct'
+	option enabled '0'
+
+config ssh_server 's_0000000000a1'
+	option name 'Lab'
+	option host '203.0.113.20'
+	option port '22'
+	option username 'vpnuser'
+	option auth 'password'
+	option fingerprint 'SHA256:rf4RpEA8ny11z3M9Q7BhLw8wItqLCTIC54xVHNqDmQo'
+	option keepalive '15'
+
+config rule 'r_0000000000a1'
+	option type 'domain'
+	option value 'example.org'
+	option enabled '1'
+
+config rule 'r_0000000000a2'
+	option type 'ip'
+	option value '10.8.0.0/16'
+	option enabled '1'

@@ -1,0 +1,54 @@
+config shadow 'main'
+	option enabled 'maybe'
+	option transport 'wireguard'
+	option mode 'everything'
+	option kill_switch '2'
+	option lists_refresh 'soon'
+	option check_endpoint 'https://example.com/'
+	option ssh_server '../x'
+	option log_level 'debug'
+
+config ssh_server 's_00000000000a'
+	option host 'bad host!'
+	option username 'bob'
+
+config ssh_server 's_00000000000b'
+	option host 'ok.example.com'
+	option username 'bob'
+	option fingerprint 'SHA256:short'
+
+config ssh_server 's_00000000000c'
+	option host 'ok.example.com'
+	option username 'bob'
+	option keepalive '2'
+
+config ssh_server 's_00000000000d'
+	option host 'ok.example.com'
+	option username 'bob'
+	option auth 'key'
+	option key 'k_00000000ffff'
+
+config ssh_server
+	option host 'anon.example.com'
+	option username 'bob'
+
+config ssh_server 's_00000000000e'
+	option host 'ok.example.com'
+	option username 'bob'
+	option port '70000'
+
+config profile 'p_00000000000a'
+	option protocol 'wireguard'
+	option host 'x.example.com'
+
+config rule 'r_00000000000a'
+	option type 'process'
+	option value 'curl'
+
+config rule 'r_00000000000b'
+	option type 'ip'
+	option value '300.1.1.1'
+
+config rule 'r_00000000000c'
+	option type 'domain'
+	option value 'not a domain'

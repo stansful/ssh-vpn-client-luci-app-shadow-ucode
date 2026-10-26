@@ -1,0 +1,36 @@
+
+config interface 'loopback'
+	option device 'lo'
+	option proto 'static'
+	list ipaddr '127.0.0.1/8'
+
+config globals 'globals'
+	option ula_prefix 'auto'
+
+# TR3000 board.d: ucidef_set_interfaces_lan_wan eth1 eth0  (lan=eth1, wan=eth0)
+config device
+	option name 'br-lan'
+	option type 'bridge'
+	list ports 'eth1'
+
+config interface 'lan'
+	option device 'br-lan'
+	option proto 'static'
+	list ipaddr '192.168.77.1/24'
+
+# Real router: proto dhcp. Docker has no DHCP server, so static here.
+config interface 'wan'
+	option device 'eth0'
+	option proto 'static'
+	list ipaddr '203.0.113.2/24'
+	option gateway '203.0.113.1'
+	# the lab ISP resolver (shadow-web): shadow.lab plus recursion to the Internet
+	list dns '203.0.113.10'
+
+# A WAN peer outside 203.0.113.0/24 (shadow-web's 198.51.100.10) for the port-forward checks: Docker
+# masquerades every 203.0.113.x source that leaves through another bridge, so a forwarded connection from a
+# WAN address would reach the LAN client as 192.168.77.254.
+config route 'lab_peer'
+	option interface 'wan'
+	option target '198.51.100.10/32'
+	option gateway '203.0.113.10'

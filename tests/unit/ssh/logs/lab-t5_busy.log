@@ -1,0 +1,4 @@
+Authenticated to 127.0.0.1 ([127.0.0.1]:22922) using "publickey".
+bind [127.0.0.1]:21080: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 21080
+Could not request local forwarding.

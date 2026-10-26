@@ -1,0 +1,9 @@
+# build/mk_apk.sh output
+out/
+# the lab's firmware downloads and throwaway secrets (tests/lab/README.md), local device-tree notes
+tests/lab/dl/
+tests/lab/state/
+tests/lab/ref/
+node_modules/
+.DS_Store
+.idea/

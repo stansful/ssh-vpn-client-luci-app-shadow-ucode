@@ -1,0 +1,286 @@
+#!/usr/bin/ucode
+'use strict';
+
+// tunnel-check [host:port]: does the tunnel carry data end to end? (DESIGN.md 10, desktop tunnel-probe.ts)
+// SOCKS5 CONNECT through xray's check-in, which routes straight to the proxy outbound, then a TLS
+// ClientHello (443/8443/993/995) or HEAD / (80/8080/8000) and the time to the first response byte,
+// all within 12 s. xray's SOCKS inbound answers CONNECT at once even when the upstream is dead, so the
+// SOCKS reply proves nothing. Prints the result as JSON and writes RUN/check.json.
+
+import * as socket from 'socket';
+import { readfile, access } from 'fs';
+import { cursor } from 'uci';
+import * as C from 'shadow-vpn.const';
+import * as state from 'shadow-vpn.state';
+import { endpoint as check_endpoint } from 'shadow-vpn.validate';
+import { ascii_host } from 'shadow-vpn.links';
+
+const TLS_PORTS = [ 443, 8443, 993, 995 ], HTTP_PORTS = [ 80, 8080, 8000 ];
+const HY2_HINT = 'Hysteria 2 runs over UDP (QUIC): the network may block UDP to the server or its ports, ' +
+	'or the link’s password (auth), certificate pin (pinSHA256) or obfs password may be wrong.';
+
+let t0 = null;
+
+function now_ms() {
+	let c = clock(true);
+
+	return c[0] * 1000 + c[1] / 1000000;
+}
+
+function remaining() {
+	return max(0, int(t0 + C.CHECK_TIMEOUT_MS - now_ms()));
+}
+
+function u16(n) {
+	return chr((n >> 8) & 255, n & 255);
+}
+
+function u24(n) {
+	return chr((n >> 16) & 255, (n >> 8) & 255, n & 255);
+}
+
+function ext(type_, body) {
+	return u16(type_) + u16(length(body)) + body;
+}
+
+function random_bytes(n) {
+	let b = readfile('/dev/urandom', n);
+
+	if (b == null || length(b) != n)
+		for (b = ''; length(b) < n; b += chr(0x5a))
+			;
+
+	return b;
+}
+
+// An ordinary TLS 1.2/1.3 ClientHello with an x25519 key share, so a TLS 1.3 server answers with a
+// ServerHello instead of a handshake_failure alert. Any reply proves the tunnel.
+function client_hello(host) {
+	let suites = '';
+
+	for (let s in [ 0x1301, 0x1302, 0x1303, 0xc02b, 0xc02f, 0xc02c, 0xc030, 0x009c, 0x009d, 0x002f, 0x0035 ])
+		suites += u16(s);
+
+	let exts = '';
+
+	if (!iptoarr(host))
+		exts += ext(0x0000, u16(length(host) + 3) + chr(0) + u16(length(host)) + host);
+
+	exts += ext(0x000b, chr(1, 0));
+	exts += ext(0x000a, u16(4) + u16(0x001d) + u16(0x0017));
+	exts += ext(0x000d, u16(12) + u16(0x0403) + u16(0x0804) + u16(0x0401) + u16(0x0503) + u16(0x0805) + u16(0x0501));
+	exts += ext(0x002b, chr(4) + u16(0x0304) + u16(0x0303));
+
+	let share = u16(0x001d) + u16(32) + random_bytes(32);
+
+	exts += ext(0x0033, u16(length(share)) + share);
+	exts += ext(0x0017, '');
+	exts += ext(0xff01, chr(0));
+
+	let session = random_bytes(32);
+	let body = u16(0x0303) + random_bytes(32) + chr(32) + session + u16(length(suites)) + suites + chr(1, 0) +
+		u16(length(exts)) + exts;
+	let hs = chr(1) + u24(length(body)) + body;
+
+	return chr(0x16, 3, 1) + u16(length(hs)) + hs;
+}
+
+// The endpoint as the settings accept it (validate.endpoint, Unicode names included); the host that goes
+// into the SOCKS request and the TLS server name is ASCII, an internationalised name in punycode.
+function parse_endpoint(v) {
+	let ep = check_endpoint(v);
+
+	if (ep.error)
+		return null;
+
+	let host = ep.host;
+
+	if (!match(host, /^[A-Za-z0-9._:-]+$/))
+		host = ascii_host(host);
+
+	if (!host || substr(host, 0, 1) == '-')
+		return null;
+
+	return { host, port: ep.port, text: ep.value };
+}
+
+// Waits for data until the deadline: a string (empty on EOF) or null on timeout.
+function recv(s, n) {
+	let left = remaining();
+
+	if (left <= 0)
+		return null;
+
+	let ev = socket.poll(left, [ s, socket.POLLIN ]);
+
+	if (!ev || !length(ev) || !ev[0][1])
+		return null;
+
+	return s.recv(n) ?? '';
+}
+
+function recv_exact(s, n) {
+	let buf = '';
+
+	while (length(buf) < n) {
+		let d = recv(s, n - length(buf));
+
+		if (d == null || d == '')
+			return { data: buf, eof: d == '', timeout: d == null };
+
+		buf += d;
+	}
+
+	return { data: buf };
+}
+
+function socks_address(host) {
+	let a = iptoarr(host);
+
+	if (a && length(a) == 4)
+		return chr(1, ...a);
+
+	if (a)
+		return chr(4, ...a);
+
+	return chr(3, length(host)) + host;
+}
+
+function classify(data, kind, where) {
+	if (length(data) >= 2 && ord(data, 1) == 0x03) {
+		if (ord(data, 0) == 0x16)
+			return { outcome: 'tls', detail: `${where} answered the TLS handshake` };
+
+		if (ord(data, 0) == 0x15)
+			return { outcome: 'tls-alert', detail: `${where} answered with a TLS alert, so the tunnel carries data but the endpoint refused the probe handshake` };
+	}
+
+	// the status line alone: LuCI words the sentence around it in the user's language
+	if (substr(data, 0, 5) == 'HTTP/')
+		return { outcome: 'http', detail: substr(trim(split(data, '\r\n')[0]), 0, 120) };
+
+	if (kind == 'tls')
+		return { outcome: 'bytes', detail: `${where} answered ${length(data)} bytes that are not a TLS record, so the tunnel carries data but something other than the endpoint may be answering` };
+
+	return { outcome: 'bytes', detail: `${where} answered ${length(data)} bytes` };
+}
+
+function probe(ep, transport) {
+	let where = `${ep.host}:${ep.port}`;
+	let not_connected = (transport == 'ssh') ? 'SSH session is not connected.' : 'Xray transport is not connected.';
+
+	if (!access(`${C.RUN}/active`))
+		return { ok: false, outcome: 'local', detail: not_connected, local: true };
+
+	let s = socket.connect({ address: '127.0.0.1', port: C.PORT_CHECK }, null, null, min(3000, remaining()));
+
+	if (!s)
+		return { ok: false, outcome: 'local', detail: not_connected, local: true };
+
+	s.send(chr(5, 1, 0));
+
+	let r = recv_exact(s, 2);
+
+	if (r.timeout)
+		return { ok: false, outcome: 'local', detail: 'Upstream SOCKS5 handshake timed out.' };
+
+	if (r.eof)
+		return { ok: false, outcome: 'local', detail: 'Upstream SOCKS5 proxy closed the connection during the handshake.' };
+
+	if (r.data != chr(5, 0))
+		return { ok: false, outcome: 'local', detail: 'Upstream SOCKS5 proxy rejected the no-auth handshake.' };
+
+	s.send(chr(5, 1, 0) + socks_address(ep.host) + u16(ep.port));
+
+	let head = recv_exact(s, 4);
+
+	if (head.timeout)
+		return { ok: false, outcome: 'local', detail: 'Upstream SOCKS5 handshake timed out.' };
+
+	if (head.eof)
+		return { ok: false, outcome: 'local', detail: 'Upstream SOCKS5 proxy closed the connection during the handshake.' };
+
+	if (ord(head.data, 0) != 5)
+		return { ok: false, outcome: 'local', detail: 'Upstream SOCKS5 proxy returned an unsupported reply version.' };
+
+	if (ord(head.data, 1) != 0)
+		return { ok: false, outcome: 'refused', socks_code: ord(head.data, 1),
+			detail: `Upstream SOCKS5 proxy refused ${where} with code ${ord(head.data, 1)}.` };
+
+	let atyp = ord(head.data, 3), rest = (atyp == 1) ? 6 : ((atyp == 4) ? 18 : null);
+
+	if (atyp == 3) {
+		let l = recv_exact(s, 1);
+
+		rest = (length(l.data) == 1) ? ord(l.data, 0) + 2 : null;
+	}
+
+	if (rest == null || length(recv_exact(s, rest).data) != rest)
+		return { ok: false, outcome: 'local', detail: 'Upstream SOCKS5 proxy returned an unsupported address type.' };
+
+	let kind = (index(TLS_PORTS, ep.port) >= 0) ? 'tls' : ((index(HTTP_PORTS, ep.port) >= 0) ? 'http' : 'silent');
+
+	if (kind == 'tls')
+		s.send(client_hello(ep.host));
+	else if (kind == 'http')
+		s.send(`HEAD / HTTP/1.1\r\nHost: ${ep.host}\r\nUser-Agent: shadow-ssh-tunnel-check\r\nAccept: */*\r\nConnection: close\r\n\r\n`);
+
+	let data = recv(s, 1024);
+	let ms = int(now_ms() - t0);
+
+	s.close();
+
+	if (data == null || data == '') {
+		if (kind == 'silent')
+			return { ok: true, outcome: 'silent', ms: null,
+				detail: `${where} sent nothing, which port ${ep.port} is not expected to; the tunnel opened the connection but could not be verified end to end` };
+
+		return { ok: false, outcome: 'timeout',
+			detail: `The tunnel opened a connection to ${where} but nothing came back within ${C.CHECK_TIMEOUT_MS / 1000} s. Traffic is entering the tunnel and not reaching the server.` };
+	}
+
+	return { ok: true, ms, ...classify(data, kind, where) };
+}
+
+function finish(endpoint, res, hint) {
+	let message;
+
+	if (res.ok) {
+		let what = (res.outcome == 'http') ? `${endpoint} answered ${res.detail}` : res.detail;
+
+		message = `Tunnel check succeeded for ${endpoint} in ${res.ms ?? int(now_ms() - t0)} ms: ${what}.`;
+	}
+	else {
+		message = res.detail;
+
+		if (hint && !res.local)
+			message = `${match(message, /[.!?]$/) ? message : message + '.'} ${HY2_HINT}`;
+	}
+
+	let out = { ok: res.ok, outcome: res.outcome, detail: res.detail, ms: res.ms ?? null, endpoint, at: time(), message };
+
+	if (res.socks_code != null)
+		out.socks_code = res.socks_code;
+
+	state.write_json(`${C.RUN}/check.json`, out);
+	state.log(res.ok ? 'info' : 'warning', res.ok ? message : `Tunnel check failed for ${endpoint}: ${message}`);
+	print(sprintf('%J\n', out));
+
+	return res.ok ? 0 : 1;
+}
+
+t0 = now_ms();
+
+let c = cursor();
+let raw = ARGV[0] ?? c.get(C.UCI, 'main', 'check_endpoint') ?? C.CHECK_ENDPOINT;
+let st = state.read();
+let transport = st.transport ?? c.get(C.UCI, 'main', 'transport') ?? 'ssh';
+let hint = transport == 'xray' && st.target?.protocol == 'hysteria2';
+let ep = parse_endpoint(raw);
+
+state.set_log_level(c.get(C.UCI, 'main', 'log_level') ?? 'warning');
+
+if (!ep)
+	exit(finish(`${raw}`, { ok: false, outcome: 'local', detail: 'Tunnel check endpoint must be host:port.', local: true }, false));
+
+exit(finish(ep.text, probe(ep, transport), hint));

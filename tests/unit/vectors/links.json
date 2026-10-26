@@ -1,0 +1,3726 @@
+[
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=ws&security=tls&path=%2Fws#Netherlands",
+  "parse": {
+   "name": "Netherlands",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:341768449060ae11a7c9caf18e2a3f497ce01ca9502b85736757946b164234a8"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "security": "tls",
+    "tlsSettings": {},
+    "wsSettings": {
+     "path": "/ws"
+    }
+   }
+  }
+ },
+ {
+  "link": "vmess://eyJ2IjoiMiIsInBzIjoidm1lc3MtZGVtbyIsImFkZCI6InZtZXNzLmV4YW1wbGUuY29tIiwicG9ydCI6Ijg0NDMiLCJpZCI6IjIyMjIyMjIyLTIyMjItNDIyMi04MjIyLTIyMjIyMjIyMjIyMiIsImFpZCI6IjAiLCJuZXQiOiJncnBjIiwidGxzIjoidGxzIn0=",
+  "parse": {
+   "name": "vmess-demo",
+   "protocol": "vmess",
+   "host": "vmess.example.com",
+   "port": 8443,
+   "transport": "grpc",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:50bc96fa24aaf64d84a1b1ad6c5e8782121b782b9d803d57cec90611a997116d"
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "vmess.example.com",
+      "port": 8443,
+      "users": [
+       {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "alterId": 0,
+        "security": "auto"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "grpc",
+    "security": "tls",
+    "tlsSettings": {},
+    "grpcSettings": {}
+   }
+  }
+ },
+ {
+  "link": "trojan://secret@trojan.example.com:443?security=tls#trojan-demo",
+  "parse": {
+   "name": "trojan-demo",
+   "protocol": "trojan",
+   "host": "trojan.example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:73a6f266b865f83c7c8c7b37701e745c4fb2261f5b648c8183a0752ec8dd6154"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "trojan.example.com",
+      "port": 443,
+      "password": "secret"
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "trojan://secret@host.example.com:443?sni=sni.example.com#gfw",
+  "parse": {
+   "name": "gfw",
+   "protocol": "trojan",
+   "host": "host.example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:4bf53e67076d49c18c8d7ac254dfeaec9eddcb3738dfe643e0c773ec46fff94b"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "host.example.com",
+      "port": 443,
+      "password": "secret"
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {
+     "serverName": "sni.example.com"
+    }
+   }
+  }
+ },
+ {
+  "link": "trojan://secret@host.example.com:443?security=none#plain",
+  "parse": {
+   "name": "plain",
+   "protocol": "trojan",
+   "host": "host.example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:99d06bd90923d9834618db670c7736243ac957952062cea55aae91a14bc61a36"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "host.example.com",
+      "port": 443,
+      "password": "secret"
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "trojan://secret@host.example.com:443?tls=0#legacy",
+  "parse": {
+   "name": "legacy",
+   "protocol": "trojan",
+   "host": "host.example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:43ab33c183ab17028110b0a352e7c57014449c74e6e49860a475019a5a4e386e"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "host.example.com",
+      "port": 443,
+      "password": "secret"
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443#bare",
+  "parse": {
+   "name": "bare",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:82b4b3bccbfc000a93756b28586720162e5796eed36f6636751b55cb974a1a37"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=xhttp&security=tls&host=cdn.example.com&path=%2Fx&mode=packet-up#demo",
+  "parse": {
+   "name": "demo",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "xhttp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:9acf330a0a9c835269b57ebd115e5553fe2642fbceaf65ed45528a50f08285d0"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "xhttp",
+    "security": "tls",
+    "tlsSettings": {},
+    "xhttpSettings": {
+     "host": "cdn.example.com",
+     "path": "/x",
+     "mode": "packet-up"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=xhttp&security=reality&sni=www.example.com&pbk=Z84J2IelR9ch3k8VtlVhhs5ycBUlXA7wHBWcBrjqnAw&sid=6ba8&fp=chrome&path=%2Fx&mode=auto&extra=%7B%22xPaddingBytes%22%3A%22100-1000%22%7D#xhttp-extra-ignored",
+  "parse": {
+   "name": "xhttp-extra-ignored",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "xhttp",
+   "security": "reality",
+   "flow": "",
+   "fingerprint": "sha256:8bd1eec1db7129112c0c61fb8fc846d64071a6ad191275a06e0542005e4bee1a"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "xhttp",
+    "security": "reality",
+    "realitySettings": {
+     "serverName": "www.example.com",
+     "publicKey": "Z84J2IelR9ch3k8VtlVhhs5ycBUlXA7wHBWcBrjqnAw",
+     "shortId": "6ba8",
+     "fingerprint": "chrome"
+    },
+    "xhttpSettings": {
+     "path": "/x",
+     "mode": "auto"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=httpupgrade&security=tls&host=cdn.example.com&path=%2Fup#demo",
+  "parse": {
+   "name": "demo",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "httpupgrade",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:fbf0c3fabd2b65cba471055ab3268442c7b376f39dfa7be5ab030c3294a8cbf2"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "httpupgrade",
+    "security": "tls",
+    "tlsSettings": {},
+    "httpupgradeSettings": {
+     "host": "cdn.example.com",
+     "path": "/up"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=http-upgrade&path=%2Fup#alias",
+  "parse": {
+   "name": "alias",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "httpupgrade",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:b91091aa6190e713da6d7136cadb91f14aa0272099eda84909052537e7116231"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "httpupgrade",
+    "httpupgradeSettings": {
+     "path": "/up"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=raw&headerType=http&security=tls#raw",
+  "parse": {
+   "name": "raw",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:2cebb99419e969482c467c6003fdb12d36b16e3c509a538945974926ccc202b9"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {},
+    "tcpSettings": {
+     "header": {
+      "type": "http"
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=kcp&security=none&headerType=wechat-video&seed=demo&mtu=1200&tti=30#demo",
+  "parse": {
+   "name": "demo",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "mkcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:2daed0bed58e75edfee058f96aa88883f404e40a070caffe67a8ac1670d1e6a8"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "kcp",
+    "kcpSettings": {
+     "mtu": 1200,
+     "tti": 30
+    },
+    "finalmask": {
+     "udp": [
+      {
+       "type": "header-wechat",
+       "settings": {}
+      },
+      {
+       "type": "mkcp-aes128gcm",
+       "settings": {
+        "password": "demo"
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=kcp&security=none#kcp-plain",
+  "parse": {
+   "name": "kcp-plain",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "mkcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:67335da2b99c7592c71ff38cdc6d6117f03e442137d4142d3401edfae52d1bc6"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "kcp",
+    "kcpSettings": {},
+    "finalmask": {
+     "udp": [
+      {
+       "type": "mkcp-original",
+       "settings": {}
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=kcp&headerType=dns&host=a.example.com#kcp-dns",
+  "parse": {
+   "name": "kcp-dns",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "mkcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:ca023a9e444dff47939e49af5798cfc0fe7a7a583b355c9cea4956348ef5e28b"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "kcp",
+    "kcpSettings": {},
+    "finalmask": {
+     "udp": [
+      {
+       "type": "header-dns",
+       "settings": {
+        "domain": "a.example.com"
+       }
+      },
+      {
+       "type": "mkcp-original",
+       "settings": {}
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=kcp&headerType=video#bad",
+  "parse": {
+   "name": "bad",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "mkcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:2a790ad5159a77c7ff4d4b7f6fd53edf90ac24de9465b87be2739ba54647c30a"
+  },
+  "outbound": {
+   "error": "Unsupported mKCP header type: video."
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=kcp&headerType=utp&seed=ignored&fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22mkcp-legacy%22%2C%22settings%22%3A%7B%22header%22%3A%22wireguard%22%7D%7D%2C%7B%22type%22%3A%22mkcp-legacy%22%2C%22settings%22%3A%7B%22value%22%3A%22pw%22%7D%7D%5D%7D#kcp-fm",
+  "parse": {
+   "name": "kcp-fm",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "mkcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:8bc01e99d6e0e9632d19b7ad1cee3b7455427b2d84e0a3d6dff7d549a1956ba6"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "kcp",
+    "kcpSettings": {},
+    "finalmask": {
+     "udp": [
+      {
+       "type": "header-wireguard",
+       "settings": {}
+      },
+      {
+       "type": "mkcp-aes128gcm",
+       "settings": {
+        "password": "pw"
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=kcp&fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22noise%22%7D%5D%7D#kcp-noise",
+  "parse": {
+   "name": "kcp-noise",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "mkcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:9d4ce5f5cb668b092c7d0c2d1d819b275b3d03a7ba8d392df5f4275c850a6dfd"
+  },
+  "outbound": {
+   "error": "Unsupported finalmask type for mKCP: noise."
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=kcp&mtu=2000&tti=5#kcp-bounds",
+  "parse": {
+   "name": "kcp-bounds",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "mkcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:a1be11890dd438be0b3aad3b717121ff6e47c61739596c3dab64d4405582a433"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "kcp",
+    "kcpSettings": {},
+    "finalmask": {
+     "udp": [
+      {
+       "type": "mkcp-original",
+       "settings": {}
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJuZXQiOiJrY3AiLCJ0eXBlIjoiZHRscyIsInBhdGgiOiJzZWVkIn0=",
+  "parse": {
+   "name": "vmess-vmess.example.com:443",
+   "protocol": "vmess",
+   "host": "vmess.example.com",
+   "port": 443,
+   "transport": "mkcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:7c420493ce846e1f4f2982e67bb84f24fa2b868c67d725fb30eca7aaae45197f"
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "vmess.example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "alterId": 0,
+        "security": "auto"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "kcp",
+    "kcpSettings": {},
+    "finalmask": {
+     "udp": [
+      {
+       "type": "header-dtls",
+       "settings": {}
+      },
+      {
+       "type": "mkcp-aes128gcm",
+       "settings": {
+        "password": "seed"
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=h2&security=tls&path=%2Fh2#h2",
+  "parse": {
+   "name": "h2",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "unknown",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:3e5e0514cf94d417b8060f29962a350072c3f911feb58ac9799117966c17de9e"
+  },
+  "outbound": {
+   "error": "Xray no longer runs the HTTP/2 transport (type=h2 or http). Ask your provider for an XHTTP link."
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=quic#quic",
+  "parse": {
+   "name": "quic",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "unknown",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:f6de56b1125fe3a8f8795ec1e50dccb73e7a1ee2bb2852ed8cac71da0557d2a4"
+  },
+  "outbound": {
+   "error": "Unsupported proxy transport: unknown."
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@пример.рф:443?type=ws&security=tls#idn",
+  "parse": {
+   "name": "idn",
+   "protocol": "vless",
+   "host": "xn--e1afmkfd.xn--p1ai",
+   "port": 443,
+   "transport": "ws",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:51714ba063914de2b77d305760cc9c5dab15767639e80ea44c44e98c959c479f"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "xn--e1afmkfd.xn--p1ai",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "security": "tls",
+    "tlsSettings": {},
+    "wsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "trojan://secret@MÜNCHEN.de:443?security=tls",
+  "parse": {
+   "name": "trojan-xn--mnchen-3ya.de:443",
+   "protocol": "trojan",
+   "host": "xn--mnchen-3ya.de",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:2d0594e8729c810243d70020385b685fc50fca10536755fe60aac4723dc7b52d"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "xn--mnchen-3ya.de",
+      "port": 443,
+      "password": "secret"
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiLQn9GA0LjQvNC10YAu0YDRhCIsInBvcnQiOjQ0MywiaWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJwcyI6ImlkbiJ9",
+  "parse": {
+   "name": "idn",
+   "protocol": "vmess",
+   "host": "xn--e1afmkfd.xn--p1ai",
+   "port": 443,
+   "transport": "tcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:75f1e27d8b7fd590f24d68dfb463cc9473feba2210c506494fdbf5cd31e14522"
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "xn--e1afmkfd.xn--p1ai",
+      "port": 443,
+      "users": [
+       {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "alterId": 0,
+        "security": "auto"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "vless://u@%zz.example:443",
+  "parse": {
+   "error": "VLESS URI must contain host and valid port."
+  },
+  "outbound": {
+   "error": "VLESS URI must contain host and valid port."
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJ0bHMiOnRydWUsIm5ldCI6IndzIiwicGF0aCI6Ii93cyIsImhvc3QiOiJjZG4uZXhhbXBsZS5jb20ifQ==",
+  "parse": {
+   "name": "vmess-vmess.example.com:443",
+   "protocol": "vmess",
+   "host": "vmess.example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:24929ae2bc32a7ee94224299b24e9653a45607122d5a74e91c05469eee35ee07"
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "vmess.example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "alterId": 0,
+        "security": "auto"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "security": "tls",
+    "tlsSettings": {},
+    "wsSettings": {
+     "path": "/ws",
+     "headers": {
+      "Host": "cdn.example.com"
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJ0bHMiOmZhbHNlfQ==",
+  "parse": {
+   "name": "vmess-vmess.example.com:443",
+   "protocol": "vmess",
+   "host": "vmess.example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:8be715e70f0bacd83609136ec9cda1126d12d25daf2ac2e3efb485e9beb538d1"
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "vmess.example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "alterId": 0,
+        "security": "auto"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJuZXQiOjd9",
+  "parse": {
+   "name": "vmess-vmess.example.com:443",
+   "protocol": "vmess",
+   "host": "vmess.example.com",
+   "port": 443,
+   "transport": "unknown",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:202ddd7dea7c28401d58e7b60dd65acdba063711353a33273bddc40edbc12f22"
+  },
+  "outbound": {
+   "error": "Unsupported proxy transport: unknown."
+  }
+ },
+ {
+  "link": "vmess://bnVsbA==",
+  "parse": {
+   "error": "VMess payload must contain add and valid port."
+  },
+  "outbound": {
+   "error": "VMess payload must contain add and valid port."
+  }
+ },
+ {
+  "link": "vmess://not-base64-json!!",
+  "parse": {
+   "error": "Invalid VMess base64 JSON payload."
+  },
+  "outbound": {
+   "error": "Unexpected token '�', \"��~m�\u001e돣��\" is not valid JSON"
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOiI0NDNhYmMiLCJpZCI6IngifQ==",
+  "parse": {
+   "error": "VMess payload must contain add and valid port."
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "vmess.example.com",
+      "port": null,
+      "users": [
+       {
+        "id": "x",
+        "alterId": 0,
+        "security": "auto"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJuZXQiOiJ3cyIsInRscyI6InRscyIsImZwIjoic2FmYXJpIiwiYWxwbiI6ImgyIiwic25pIjoi0L/RgNC40LzQtdGALtGA0YQiLCJzY3kiOiJhZXMtMTI4LWdjbSIsImFpZCI6MH0=",
+  "parse": {
+   "name": "vmess-vmess.example.com:443",
+   "protocol": "vmess",
+   "host": "vmess.example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:f6e5303a72ed92a891e52b5d9326d7d4f5a9e6fff37babb669294d13c38a37df"
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "vmess.example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "alterId": 0,
+        "security": "aes-128-gcm"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "security": "tls",
+    "tlsSettings": {
+     "serverName": "xn--e1afmkfd.xn--p1ai",
+     "alpn": [
+      "h2"
+     ],
+     "fingerprint": "safari"
+    },
+    "wsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiJleGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJuZXQiOiJncnBjIiwidHlwZSI6Im11bHRpIiwicGF0aCI6InN2YyIsInRscyI6InRscyJ9",
+  "parse": {
+   "name": "vmess-example.com:443",
+   "protocol": "vmess",
+   "host": "example.com",
+   "port": 443,
+   "transport": "grpc",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:4fcfa6edc6641def59db6e260041e07cabc7a3c9d25ca7fbac90fb2d718a9757"
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "alterId": 0,
+        "security": "auto"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "grpc",
+    "security": "tls",
+    "tlsSettings": {},
+    "grpcSettings": {
+     "serviceName": "svc",
+     "multiMode": true
+    }
+   }
+  }
+ },
+ {
+  "link": "vmess://eyJhZGQiOiJleGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIyMjIyMjIyMi0yMjIyLTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJuZXQiOiJ3cyIsInRscyI6InRscyJ9",
+  "parse": {
+   "name": "vmess-example.com:443",
+   "protocol": "vmess",
+   "host": "example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:348b9baa350613a6f4e2443fc14d4c6e699daacebf5093494076c0df9bc5e6f1"
+  },
+  "outbound": {
+   "protocol": "vmess",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "alterId": 0,
+        "security": "auto"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "security": "tls",
+    "tlsSettings": {},
+    "wsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=ws&security=0#zero",
+  "parse": {
+   "name": "zero",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:954baa0c4ef865b47e6070e3539ef76f3429d14ba5b79edb2a8bc2c6ccf194d6"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "wsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=ws&security=xtls#xtls",
+  "parse": {
+   "name": "xtls",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "unknown",
+   "flow": "",
+   "fingerprint": "sha256:aaa276f9a71ad3b66c9d54d81ede3beeccb00b68506d38d1e69d521a83c0a4bf"
+  },
+  "outbound": {
+   "error": "Unsupported proxy security mode."
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@пример.рф:443?security=tls&sni=%D0%BF%D1%80%D0%B8%D0%BC%D0%B5%D1%80.%D1%80%D1%84&type=ws&host=cdn.example.com&path=%2F#idn-sni",
+  "parse": {
+   "name": "idn-sni",
+   "protocol": "vless",
+   "host": "xn--e1afmkfd.xn--p1ai",
+   "port": 443,
+   "transport": "ws",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:cdb00644525c1cc41d3ee77ff75b3d89499cac5a08043fb69431c37f63c0f352"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "xn--e1afmkfd.xn--p1ai",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "security": "tls",
+    "tlsSettings": {
+     "serverName": "xn--e1afmkfd.xn--p1ai"
+    },
+    "wsSettings": {
+     "path": "/",
+     "headers": {
+      "Host": "cdn.example.com"
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "trojan://secret@host.example.com:443?servername=M%C3%BCnchen.de#idn",
+  "parse": {
+   "name": "idn",
+   "protocol": "trojan",
+   "host": "host.example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:91cec122bde3b118c1b286c89c40f6dae3bb39565cd843843ab1696e01b13c14"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "host.example.com",
+      "port": 443,
+      "password": "secret"
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {
+     "serverName": "xn--mnchen-3ya.de"
+    }
+   }
+  }
+ },
+ {
+  "link": "trojan://secret@host.example.com:443?sni=CDN.example.com#ascii",
+  "parse": {
+   "name": "ascii",
+   "protocol": "trojan",
+   "host": "host.example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:4f9eee9f282bb05d5a18fb93e7b3f13ab7b36537b349d9fd362b29f7288c3b02"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "host.example.com",
+      "port": 443,
+      "password": "secret"
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {
+     "serverName": "CDN.example.com"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=ws&security=tls&sni=cdn.example.com&alpn=h2%2Chttp%2F1.1&fp=chrome#tls",
+  "parse": {
+   "name": "tls",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:5f414ebe1ab84e5638ea92960608117508f15f0023e93a55c58faac9ed8ba272"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "security": "tls",
+    "tlsSettings": {
+     "serverName": "cdn.example.com",
+     "alpn": [
+      "h2",
+      "http/1.1"
+     ],
+     "fingerprint": "chrome"
+    },
+    "wsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?security=tls&type=tcp&fp=none#fp-none",
+  "parse": {
+   "name": "fp-none",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:5c58a8d614076342cbe1690caec5a727495f858bd9b38bd87eefa7bafa829573"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "trojan://secret@example.com:443?security=tls&fp=HelloChrome_120#fp-hello",
+  "parse": {
+   "name": "fp-hello",
+   "protocol": "trojan",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:f1d4389246240bd7ee5e4291fa09b7f5da9f3b288d212b176a61670dd8f688d3"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "password": "secret"
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {
+     "fingerprint": "HelloChrome_120"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=grpc&security=reality&sni=www.example.com&pbk=PUBLICKEY&sid=ab&fp=chrome&spx=%2Fsearch&serviceName=svc&mode=multi#reality",
+  "parse": {
+   "name": "reality",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "grpc",
+   "security": "reality",
+   "flow": "",
+   "fingerprint": "sha256:2b6216bde076f5f754603317004893350bf8905caba6481e763cb84e5006bc71"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "grpc",
+    "security": "reality",
+    "realitySettings": {
+     "serverName": "www.example.com",
+     "publicKey": "PUBLICKEY",
+     "shortId": "ab",
+     "spiderX": "/search",
+     "fingerprint": "chrome"
+    },
+    "grpcSettings": {
+     "serviceName": "svc",
+     "multiMode": true
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=tcp&security=reality&sni=www.example.com&pbk=Z84J2IelR9ch3k8VtlVhhs5ycBUlXA7wHBWcBrjqnAw&sid=6ba85179e30d4fc2&fp=random&flow=xtls-rprx-vision#reality-vision",
+  "parse": {
+   "name": "reality-vision",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "reality",
+   "flow": "xtls-rprx-vision",
+   "fingerprint": "sha256:d179bbd31ed00b34b1aa12f40d69c1e29853ae612ed33c4ea6b3f3dc964a695a"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none",
+        "flow": "xtls-rprx-vision"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "reality",
+    "realitySettings": {
+     "serverName": "www.example.com",
+     "publicKey": "Z84J2IelR9ch3k8VtlVhhs5ycBUlXA7wHBWcBrjqnAw",
+     "shortId": "6ba85179e30d4fc2",
+     "fingerprint": "random"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=grpc&security=tls&serviceName=svc&mode=gun#gun",
+  "parse": {
+   "name": "gun",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "grpc",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:741b0f42f6e48b88e6b397f88a24c7ed7c2824dadf381d7125d585acf009b9c0"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "grpc",
+    "security": "tls",
+    "tlsSettings": {},
+    "grpcSettings": {
+     "serviceName": "svc"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=grpc&security=tls&path=from-path#grpc-path",
+  "parse": {
+   "name": "grpc-path",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "grpc",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:7a850c7283ea005f6999d78491e29c5e460b24d2e62a39b4bb79ce423cd88a5e"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "grpc",
+    "security": "tls",
+    "tlsSettings": {},
+    "grpcSettings": {
+     "serviceName": "from-path"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=hysteria&security=tls&auth=pw&up=20&congestion=bbr#vless-hy",
+  "parse": {
+   "name": "vless-hy",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:3a8b53792265168bed0c47b6410e8bc1ba8b002ec42a17f82d1869bc769b02f4"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "tlsSettings": {
+     "serverName": "example.com"
+    },
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "finalmask": {
+     "quicParams": {
+      "congestion": "bbr",
+      "brutalUp": "20000000 bps"
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=hysteria&security=tls&sni=&auth=pw#vless-hy-empty-sni",
+  "parse": {
+   "name": "vless-hy-empty-sni",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:6fe28c057e11edf0d7c5736a2d3409feba31155fc0fc3a853f251ee1041b51f5"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "tlsSettings": {
+     "serverName": "example.com"
+    },
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=hysteria&auth=pw#vless-hy-no-tls",
+  "parse": {
+   "name": "vless-hy-no-tls",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:ef07403a9d8d06e65fd4be38f083102adf4fd13dbd2e231bd2c4907c4f263e68"
+  },
+  "outbound": {
+   "error": "The hysteria transport needs security=tls."
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?security=tls&flow=&encryption=mlkem768x25519plus.native.0rtt.abc#empty-flow",
+  "parse": {
+   "name": "empty-flow",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:6135eaf214c8a2b8fea89fa779f4a87c8f4f5a7bfe4045f4984b226b4f68a4a2"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "mlkem768x25519plus.native.0rtt.abc",
+        "flow": ""
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@[2001:DB8:0:0::1]:443?security=tls#v6",
+  "parse": {
+   "name": "v6",
+   "protocol": "vless",
+   "host": "2001:db8::1",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:a2837f00e42ad8fb9145a8b22cd6b1ede962130311d5ff3b8362d9b7b8a20e0d"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "2001:db8::1",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com?security=tls#noport",
+  "parse": {
+   "error": "VLESS URI must contain host and valid port."
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 0,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:70000?security=tls#bigport",
+  "parse": {
+   "error": "Invalid VLESS URI."
+  },
+  "outbound": {
+   "error": "Invalid URL"
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:0443?security=tls#leading-zero",
+  "parse": {
+   "name": "leading-zero",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:4e447135e66df20f0e2b8e457b42709ccf9e383408f982b8161298504678c6ba"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "trojan://pa:ss@example.com:443#colon-pass",
+  "parse": {
+   "name": "colon-pass",
+   "protocol": "trojan",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:1b452fe5c9d2cc2ddbffe5231f15c06e155c3dd22c621b8c22a2ef595742359d"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "password": "pa"
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "trojan://p%40ss%3Aw@example.com:443#encoded-pass",
+  "parse": {
+   "name": "encoded-pass",
+   "protocol": "trojan",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:2d9dd89a4911bb8484525d8bc73d43eede3836911dcf22a130e8df2b48f92c72"
+  },
+  "outbound": {
+   "protocol": "trojan",
+   "tag": "proxy",
+   "settings": {
+    "servers": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "password": "p@ss:w"
+     }
+    ]
+   },
+   "streamSettings": {
+    "security": "tls",
+    "tlsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?Type=ws&Security=tls#case-keys",
+  "parse": {
+   "name": "case-keys",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:1df356f18bd52cbe8ec67a164523503cb45ff211266b9b8873a5abae2e5180be"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=ws&path=%2Fa+b&host=h#plus",
+  "parse": {
+   "name": "plus",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:6fbabb3a6fe85df826a67028c603d231e5fea793a49e26c5107ab852192b3094"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "wsSettings": {
+     "path": "/a b",
+     "headers": {
+      "Host": "h"
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443?type=ws&type=grpc#dup",
+  "parse": {
+   "name": "dup",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:b8043a76ead065db5ba638b395855bb6cd34b15a59c3d4770b6ff30ab33459f3"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "wsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443/?type=ws#slash-path",
+  "parse": {
+   "name": "slash-path",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "ws",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:0fcdcc5d870d054245b6496afbe21d0509ca5292dd65e5c8546e6197c07e14a4"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {
+    "network": "ws",
+    "wsSettings": {}
+   }
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443#%E0%A4%A",
+  "parse": {
+   "name": "%E0%A4%A",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:87ca1347349b5d4e5bae34abc5d97570c3e150624784de85701af76d817d8c55"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "vless://11111111-1111-4111-8111-111111111111@example.com:443#",
+  "parse": {
+   "name": "vless-example.com:443",
+   "protocol": "vless",
+   "host": "example.com",
+   "port": 443,
+   "transport": "tcp",
+   "security": "none",
+   "flow": "",
+   "fingerprint": "sha256:5ce7b930bf560022e2e967482138becec8f96d7818c75fe19bc8e3ae2b28781e"
+  },
+  "outbound": {
+   "protocol": "vless",
+   "tag": "proxy",
+   "settings": {
+    "vnext": [
+     {
+      "address": "example.com",
+      "port": 443,
+      "users": [
+       {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "encryption": "none"
+       }
+      ]
+     }
+    ]
+   },
+   "streamSettings": {}
+  }
+ },
+ {
+  "link": "hysteria2://letmein@example.com:8443/?sni=real.example.com&obfs=salamander&obfs-password=gawrgura&pinSHA256=ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716#Helsinki%20QUIC",
+  "parse": {
+   "name": "Helsinki QUIC",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 8443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:7e8d9858e9f2adf30c00e9fc3f26b1242f534bc7101a5d0da6c1ab7c788e8449"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 8443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "letmein"
+    },
+    "tlsSettings": {
+     "serverName": "real.example.com",
+     "alpn": [
+      "h3"
+     ],
+     "pinnedPeerCertSha256": "ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716"
+    },
+    "finalmask": {
+     "udp": [
+      {
+       "type": "salamander",
+       "settings": {
+        "password": "gawrgura"
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hy2://secret@Node.Example.com",
+  "parse": {
+   "name": "hysteria2-node.example.com:443",
+   "protocol": "hysteria2",
+   "host": "node.example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:8ed6f5e69c8b334049a521b38cdddafc2c0ef17df2251f81a17a0b805e7c951a"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "node.example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "secret"
+    },
+    "tlsSettings": {
+     "serverName": "node.example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hy2://letmein@example.com:8443/?insecure=1#demo",
+  "parse": {
+   "name": "demo",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 8443,
+   "insecureWithoutPin": true,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:e98bd1a08a06860dcd3dc7f9e6ce4607d4b9ec75276c8dc4d34de98418797c5b"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 8443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "letmein"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:443,20000-30000/?sni=cdn.example.com&obfs=salamander&obfs-password=secret&pinSHA256=ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716&up=50&down=100&hop_interval=10#demo",
+  "parse": {
+   "name": "demo",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "hopPorts": "443,20000-30000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:af7a25723d955489f37bb40941ae281a579d1f70102d8d4ef06694639749c1f0"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "cdn.example.com",
+     "alpn": [
+      "h3"
+     ],
+     "pinnedPeerCertSha256": "ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716"
+    },
+    "finalmask": {
+     "udp": [
+      {
+       "type": "salamander",
+       "settings": {
+        "password": "secret"
+       }
+      }
+     ],
+     "quicParams": {
+      "brutalUp": "50000000 bps",
+      "brutalDown": "100000000 bps",
+      "udpHop": {
+       "ports": "443,20000-30000",
+       "interval": 10
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:20000-30000?obfs-password=secret",
+  "parse": {
+   "name": "hysteria2-example.com:20000",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 20000,
+   "hopPorts": "20000-30000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:6583ab99314f2901c62212a69b09ac1b85a8efd81f720cddcf1bd47fc3fb8182"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 20000
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "udp": [
+      {
+       "type": "salamander",
+       "settings": {
+        "password": "secret"
+       }
+      }
+     ],
+     "quicParams": {
+      "udpHop": {
+       "ports": "20000-30000",
+       "interval": 30
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:30000-20000",
+  "parse": {
+   "name": "hysteria2-example.com:20000",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 20000,
+   "hopPorts": "20000-30000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:2798db58d7c451fed0f6c67e8c27e0f78de348c60418e7f8656be6deb43040c4"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 20000
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "udpHop": {
+       "ports": "20000-30000",
+       "interval": 30
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hy2://pw@example.com:443?mport=20000:30000&mportHopInt=10",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "hopPorts": "20000-30000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:cd684b3a64fddda46f6311175b446c7d0eed3fce46c5cd78928793352e6f3f17"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "udpHop": {
+       "ports": "20000-30000",
+       "interval": 10
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:443?fm=%7B%22quicParams%22%3A%7B%22udpHop%22%3A%7B%22ports%22%3A%2240000-50000%22%2C%22interval%22%3A%225-15%22%7D%7D%7D",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "hopPorts": "40000-50000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:b2f4b1e420bdcb6621a12f466ade685421973605c8673ce3129b59054dbaca65"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "udpHop": {
+       "ports": "40000-50000",
+       "interval": "5-15"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:443,443",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:93196fc00372f471687e2c4466776591ae97efda1b068a7e3ffb2348ed81cbcb"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:1000-2000?hop_interval=2s",
+  "parse": {
+   "name": "hysteria2-example.com:1000",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 1000,
+   "hopPorts": "1000-2000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:6a22cc68d0e2ce9a9bd7428be741d682dcae54635a9c55863350b342e5cd6d45"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 1000
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "udpHop": {
+       "ports": "1000-2000",
+       "interval": 5
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:1000-2000?hop_interval=30s&hop_interval_max=60s",
+  "parse": {
+   "name": "hysteria2-example.com:1000",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 1000,
+   "hopPorts": "1000-2000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:77694aafad47e711c44eeb95a8ee9c6249bd727f02aadb2123ffdb854c2d85c7"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 1000
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "udpHop": {
+       "ports": "1000-2000",
+       "interval": "30-60"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:1000-2000?hopInterval=bogus",
+  "parse": {
+   "name": "hysteria2-example.com:1000",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 1000,
+   "hopPorts": "1000-2000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:6d93aa66bd080a6d21add8cd0ccf5bfc371571d6fd1ee0504be4306e89ce24dc"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 1000
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "udpHop": {
+       "ports": "1000-2000",
+       "interval": 30
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:20000-30000,443,25000-35000,35001-36000,443",
+  "parse": {
+   "name": "hysteria2-example.com:20000",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 20000,
+   "hopPorts": "443,20000-36000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:e42dacecb51b9e23146b4cf92dcb10fa235d9095bd730f0cb60bd3b474fa21da"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 20000
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "udpHop": {
+       "ports": "443,20000-36000",
+       "interval": 30
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hy2://pw@example.com:443?fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22UDPHOP%22%2C%22settings%22%3A%7B%22mode%22%3A%22intervallocal%22%2C%22interval%22%3A%2210-20%22%2C%22remotePorts%22%3A%2220000%3A30000%22%7D%7D%2C%7B%22type%22%3A%22salamander%22%2C%22settings%22%3A%7B%22password%22%3A%22s%22%7D%7D%5D%7D",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "hopPorts": "20000-30000",
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:8f278a6f51b9e3f4f78307613ff6bcf8c62c5924b84cfc56810fb0c0d2e1d3cd"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "udp": [
+      {
+       "type": "salamander",
+       "settings": {
+        "password": "s"
+       }
+      }
+     ],
+     "quicParams": {
+      "udpHop": {
+       "ports": "20000-30000",
+       "interval": "10-20"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://user%40mail:p%40ss@example.com:443",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:d0128f3470f162ce65feec169e8633a806a2a54ae6217adf8d816a4bbe06299f"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "user@mail:p@ss"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://a/b@c@example.com:443/?sni=x",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:5247d495f4817795d211ff8b7ba2f671e257f045204bf88a381735e604823d12"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "a/b@c"
+    },
+    "tlsSettings": {
+     "serverName": "x",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@[2001:DB8::1]:443",
+  "parse": {
+   "name": "hysteria2-2001:db8::1:443",
+   "protocol": "hysteria2",
+   "host": "2001:db8::1",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:af008028289a07f67103f25ef64c975b7994d3c5b51429c6154274d6dd824371"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "2001:db8::1",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "2001:db8::1",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://user:pass@[2001:db8::1]:443/?insecure=1#ipv6",
+  "parse": {
+   "name": "ipv6",
+   "protocol": "hysteria2",
+   "host": "2001:db8::1",
+   "port": 443,
+   "insecureWithoutPin": true,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:5d649b1fdef5f52d14a00c8933e4b66e8a71c5e6dd062c13c6927e03fb4cc42c"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "2001:db8::1",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "user:pass"
+    },
+    "tlsSettings": {
+     "serverName": "2001:db8::1",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@пример.рф:443",
+  "parse": {
+   "name": "hysteria2-xn--e1afmkfd.xn--p1ai:443",
+   "protocol": "hysteria2",
+   "host": "xn--e1afmkfd.xn--p1ai",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:99256418bca010c294da4851718d24668cff97d581b07e834dd752df703a494f"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "xn--e1afmkfd.xn--p1ai",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "xn--e1afmkfd.xn--p1ai",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@:443",
+  "parse": {
+   "error": "Hysteria 2 link must contain a server host."
+  },
+  "outbound": {
+   "error": "Hysteria 2 link must contain a server host."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:0",
+  "parse": {
+   "error": "Hysteria 2 link has an invalid port list."
+  },
+  "outbound": {
+   "error": "Hysteria 2 link has an invalid port list."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:443,",
+  "parse": {
+   "error": "Hysteria 2 link has an invalid port list."
+  },
+  "outbound": {
+   "error": "Hysteria 2 link has an invalid port list."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:70000",
+  "parse": {
+   "error": "Hysteria 2 link has an invalid port list."
+  },
+  "outbound": {
+   "error": "Hysteria 2 link has an invalid port list."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:abc",
+  "parse": {
+   "error": "Hysteria 2 link has an invalid port list."
+  },
+  "outbound": {
+   "error": "Hysteria 2 link has an invalid port list."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com:443?mport=20000-70000",
+  "parse": {
+   "error": "Hysteria 2 link has an invalid port list."
+  },
+  "outbound": {
+   "error": "Hysteria 2 link has an invalid port list."
+  }
+ },
+ {
+  "link": "hysteria2://pw@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:443",
+  "parse": {
+   "error": "Invalid Hysteria 2 link."
+  },
+  "outbound": {
+   "error": "Invalid Hysteria 2 link."
+  }
+ },
+ {
+  "link": "hysteria2://pw@[2001:db8::1",
+  "parse": {
+   "error": "Invalid Hysteria 2 link."
+  },
+  "outbound": {
+   "error": "Invalid Hysteria 2 link."
+  }
+ },
+ {
+  "link": "hysteria2://pw@exa mple.com",
+  "parse": {
+   "error": "Invalid Hysteria 2 link."
+  },
+  "outbound": {
+   "error": "Invalid Hysteria 2 link."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?obfs-password=nekobox",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:5b6c1045cdcd92018e4e17460c264c1ff4eadd451eb7a6c5bc55f36c79e30161"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "udp": [
+      {
+       "type": "salamander",
+       "settings": {
+        "password": "nekobox"
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?obfs=none&obfs-password=x",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:91b1a950e9693b605ecc6e46d4933a48243ddf98fd1b09e8fdf365f186053177"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?obfs=salamander",
+  "parse": {
+   "error": "Hysteria 2 salamander obfuscation needs obfs-password."
+  },
+  "outbound": {
+   "error": "Hysteria 2 salamander obfuscation needs obfs-password."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?obfs=gecko&obfs-password=x",
+  "parse": {
+   "error": "Unsupported Hysteria 2 obfuscation: gecko. Only salamander works."
+  },
+  "outbound": {
+   "error": "Unsupported Hysteria 2 obfuscation: gecko. Only salamander works."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?pinSHA256=BA:88:45:2F:1B:0C:1A:3C:4D:7E:6F:5A:49:38:27:16:BA:88:45:2F:1B:0C:1A:3C:4D:7E:6F:5A:49:38:27:16",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:5f21484ae5c2f466fb40e1d3587ec7281d76f303f410d738693cabf9beae8a04"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ],
+     "pinnedPeerCertSha256": "ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716"
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?pinSHA256=uohFLxsMGjxNfm9aSTgnFrqIRS8bDBo8TX5vWkk4JxY%3D",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:36dcb14ae66068adbe0245f51fb189b9c7f97eed5b09c852dec53a4acd458bfc"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ],
+     "pinnedPeerCertSha256": "ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716"
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?pinSHA256=ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716,1111111111111111111111111111111111111111111111111111111111111111&pcs=ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:b0d348a771765a1067c34e94f0e3c2e27ebe4c163f855cedfa91ca7b3aa4530e"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ],
+     "pinnedPeerCertSha256": "ba88452f1b0c1a3c4d7e6f5a49382716ba88452f1b0c1a3c4d7e6f5a49382716,1111111111111111111111111111111111111111111111111111111111111111"
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?pinSHA256=deadbeef",
+  "parse": {
+   "error": "Invalid Hysteria 2 pinSHA256: expected a SHA-256 certificate hash."
+  },
+  "outbound": {
+   "error": "Invalid Hysteria 2 pinSHA256: expected a SHA-256 certificate hash."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?allowInsecure=true",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "insecureWithoutPin": true,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:ccd74d6db0534a1f375f2e8059a5b4ce26c36693a763bfd831e56e6acd3df841"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?up=50&downmbps=100",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:62dd32e2942761ae150fafa40e7237e65f0f599af47c3007f96aecd369061cbe"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "brutalUp": "50000000 bps",
+      "brutalDown": "100000000 bps"
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?up=100%20kbps",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:a548b307f696b162f91d2d4691235a6b4c4f206334b092f6e4d4413d8e357559"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22salamander%22%2C%22settings%22%3A%7B%22password%22%3A%22from-fm%22%7D%7D%5D%2C%22quicParams%22%3A%7B%22congestion%22%3A%22BBR%22%2C%22brutalUp%22%3A%2260%20mbps%22%2C%22maxIdleTimeout%22%3A60%2C%22keepAlivePeriod%22%3A1%2C%22debug%22%3Atrue%7D%7D",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:a3f68e4642a8bc904ff31a8f3a9ff6baa38fb0dcc177fa6d0aa6e9a98cf079cc"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "udp": [
+      {
+       "type": "salamander",
+       "settings": {
+        "password": "from-fm"
+       }
+      }
+     ],
+     "quicParams": {
+      "congestion": "bbr",
+      "brutalUp": "60 mbps",
+      "maxIdleTimeout": 60
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?obfs-password=link&up=10&fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22salamander%22%2C%22settings%22%3A%7B%22password%22%3A%22from-fm%22%7D%7D%5D%2C%22quicParams%22%3A%7B%22congestion%22%3A%22BBR%22%2C%22brutalUp%22%3A%2260%20mbps%22%7D%7D",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:94021d61fb761a7115044d283ca0b8465183e3d542803ec9121f19d3d873abeb"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "udp": [
+      {
+       "type": "salamander",
+       "settings": {
+        "password": "link"
+       }
+      }
+     ],
+     "quicParams": {
+      "congestion": "bbr",
+      "brutalUp": "10000000 bps"
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?fm=%7B%22quicParams%22%3A%7B%22congestion%22%3A%22force-brutal%22%7D%7D",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:84c10bad548e31476de77dacb36784c3476cf3de45b4a0ee306c3576d4782c65"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?fm=%7B%22quicParams%22%3A%7B%22congestion%22%3A%22force-brutal%22%2C%22brutalUp%22%3A%2260%20mbps%22%2C%22maxIdleTimeout%22%3A60%7D%7D",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:82f2c974f1ec1662d5073207fe09acc3cdb5eb45a1a988a8a479dfdc49f531d6"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    },
+    "finalmask": {
+     "quicParams": {
+      "congestion": "force-brutal",
+      "brutalUp": "60 mbps",
+      "maxIdleTimeout": 60
+     }
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?fm=%7Bnot-json",
+  "parse": {
+   "error": "Invalid Hysteria 2 fm parameter: expected finalmask JSON."
+  },
+  "outbound": {
+   "error": "Invalid Hysteria 2 fm parameter: expected finalmask JSON."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22noise%22%7D%5D%7D",
+  "parse": {
+   "error": "Unsupported Hysteria 2 finalmask type: noise."
+  },
+  "outbound": {
+   "error": "Unsupported Hysteria 2 finalmask type: noise."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com?fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22salamander%22%2C%22settings%22%3A%7B%22password%22%3A%22x%22%2C%22packetSize%22%3A%22512-1200%22%7D%7D%5D%7D",
+  "parse": {
+   "error": "Unsupported Hysteria 2 finalmask type: salamander with packetSize."
+  },
+  "outbound": {
+   "error": "Unsupported Hysteria 2 finalmask type: salamander with packetSize."
+  }
+ },
+ {
+  "link": "hysteria2://pw@example.com#Tokyo%201?serverDescription=aGVsbG8=",
+  "parse": {
+   "name": "Tokyo 1",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:6a2de4106bdf31229cb7ac3e8fca5143d452d5a8ab7a8e5ec01520fdad6e33cb"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hy2://pw@example.com?ech=AAP%2BDQA%3D",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:14ef221f1b5f2165aa288d6442bd407ed80b2c5e04d70fa9bb4390ad96d2614f"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "example.com",
+     "alpn": [
+      "h3"
+     ],
+     "echConfigList": "AAP+DQA="
+    }
+   }
+  }
+ },
+ {
+  "link": "hy2://pw@example.com?ech=udp%3A%2F%2F127.0.0.1%3A53",
+  "parse": {
+   "error": "Invalid Hysteria 2 ech: expected a base64 ECHConfigList."
+  },
+  "outbound": {
+   "error": "Invalid Hysteria 2 ech: expected a base64 ECHConfigList."
+  }
+ },
+ {
+  "link": "hy2://pw@example.com?ech=AAAA",
+  "parse": {
+   "error": "Invalid Hysteria 2 ech: expected a base64 ECHConfigList."
+  },
+  "outbound": {
+   "error": "Invalid Hysteria 2 ech: expected a base64 ECHConfigList."
+  }
+ },
+ {
+  "link": "hy2://pw@example.com?vcn=real.example.com&peer=peer.example.com",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:20ca97067c52706f10efc1d435f737e339166e1e809774b6ebfe94f297459d08"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "peer.example.com",
+     "alpn": [
+      "h3"
+     ],
+     "verifyPeerCertByName": "real.example.com"
+    }
+   }
+  }
+ },
+ {
+  "link": "HY2://pw@example.com?SNI=Upper.example.com",
+  "parse": {
+   "name": "hysteria2-example.com:443",
+   "protocol": "hysteria2",
+   "host": "example.com",
+   "port": 443,
+   "transport": "hysteria",
+   "security": "tls",
+   "flow": "",
+   "fingerprint": "sha256:03c7d7ba57b04e6757cf773b0c5553ef8c84907cc678a8834713c4049cb3a4f9"
+  },
+  "outbound": {
+   "protocol": "hysteria",
+   "tag": "proxy",
+   "settings": {
+    "version": 2,
+    "address": "example.com",
+    "port": 443
+   },
+   "streamSettings": {
+    "network": "hysteria",
+    "security": "tls",
+    "hysteriaSettings": {
+     "version": 2,
+     "auth": "pw"
+    },
+    "tlsSettings": {
+     "serverName": "Upper.example.com",
+     "alpn": [
+      "h3"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "link": "hysteria://pw@example.com:443#v1",
+  "parse": {
+   "error": "Only vless://, vmess://, trojan://, and hysteria2:// links are supported."
+  },
+  "outbound": {
+   "error": "Unsupported proxy URI protocol."
+  }
+ },
+ {
+  "link": "tuic://x@example.com:443",
+  "parse": {
+   "error": "Only vless://, vmess://, trojan://, and hysteria2:// links are supported."
+  },
+  "outbound": {
+   "error": "Unsupported proxy URI protocol."
+  }
+ },
+ {
+  "link": "ss://YWVzLTI1Ni1nY206cGFzcw@example.com:8388#ss",
+  "parse": {
+   "error": "Only vless://, vmess://, trojan://, and hysteria2:// links are supported."
+  },
+  "outbound": {
+   "error": "Unsupported proxy URI protocol."
+  }
+ }
+]

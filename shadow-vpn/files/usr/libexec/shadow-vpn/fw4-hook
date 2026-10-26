@@ -1,0 +1,113 @@
+#!/bin/sh
+# Heals Shadow's data plane; never calls fw4 or UCI and never waits for our lock.
+# - fw4 script include (sourced by fw4 after every start/reload, under fw4's lock): reload the
+#   pre-rendered table when "firewall stop" or a flush removed it, and SIGHUP dnsmasq so the
+#   name-filled sets refill;
+# - "fw4-hook --iface" from the iface hotplug hook: the same, and a re-render when the WAN DNS changed or
+#   (apply lan-check) when an interface outside the WAN zone brought a new LAN device or prefix.
+# Both check the fwmark rule and the local route of table 106 (an lo flap drops the route, not the rule).
+
+SHADOW_RUN=/var/run/shadow-vpn
+SHADOW_LOCK=/var/lock/shadow-vpn.lock
+
+shadow_hup_dnsmasq() {
+	local inst confdir
+
+	[ -s "$SHADOW_RUN/dnsmasq" ] || return 0
+	read -r inst confdir < "$SHADOW_RUN/dnsmasq"
+	case "$inst" in *[!A-Za-z0-9_]*|"") return 0 ;; esac
+	ubus call service signal "{\"name\":\"dnsmasq\",\"instance\":\"$inst\",\"signal\":1}" >/dev/null 2>&1
+}
+
+# Exactly the address ssh is connected to: the restored table carries the one of the last render.
+shadow_ssh_addr() {
+	local sid ip set=server4
+
+	[ -s "$SHADOW_RUN/ssh.sid" ] || return 0
+	read -r sid < "$SHADOW_RUN/ssh.sid"
+	case "$sid" in s_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;; *) return 0 ;; esac
+	[ -s "$SHADOW_RUN/ssh.$sid.addr" ] || return 0
+	read -r ip < "$SHADOW_RUN/ssh.$sid.addr"
+	case "$ip" in *[!0-9A-Fa-f.:]*|"") return 0 ;; *:*) set=server6 ;; esac
+	nft add element inet shadow_vpn $set "{ $ip }" 2>/dev/null
+}
+
+# one small chain instead of the whole table: listing it would print every dnsmasq-filled set
+shadow_table_ok() {
+	nft list chain inet shadow_vpn gate >/dev/null 2>&1
+}
+
+shadow_rule_ok() {
+	ip -$1 rule show 2>/dev/null | grep -q 'fwmark 0x400000/0x400000 lookup 106'
+}
+
+shadow_route_ok() {
+	ip -$1 route show table 106 2>/dev/null | grep -q '^local default'
+}
+
+shadow_rules() {
+	local fam dst
+
+	for fam in 4 6; do
+		if [ $fam = 4 ]; then dst=0.0.0.0/0; else dst=::/0; fi
+		[ $fam = 6 ] && [ ! -e /proc/net/if_inet6 ] && continue
+		shadow_rule_ok $fam || ip -$fam rule add fwmark 0x400000/0x400000 table 106 priority 106 2>/dev/null
+		shadow_route_ok $fam || ip -$fam route replace local $dst dev lo table 106 2>/dev/null
+	done
+}
+
+# RUN/wan_dns: "# <resolvfile>" then the nameservers it listed at the last render.
+shadow_wan_dns_changed() {
+	local first file now
+
+	[ -s "$SHADOW_RUN/wan_dns" ] || return 1
+	read -r first file < "$SHADOW_RUN/wan_dns"
+	[ "$first" = "#" ] && [ -n "$file" ] || return 1
+	now="$(sed -n 's/^[[:space:]]*nameserver[[:space:]]\{1,\}\([0-9A-Fa-f.:]\{1,\}\)[[:space:]]*$/\1/p' "$file" 2>/dev/null | sort -u)"
+	[ "$now" != "$(sed '1d' "$SHADOW_RUN/wan_dns")" ]
+}
+
+# An ifup outside the WAN zone (hotplug's $INTERFACE): a new LAN-zone device or a changed LAN-side prefix
+# feeds the render (the lan_if set, the local sets), which `apply lan-check` compares.
+shadow_lan_side() {
+	[ "$1" = --iface ] && [ -n "$INTERFACE" ] && [ "$INTERFACE" != loopback ] &&
+		[ -s "$SHADOW_RUN/wan_networks" ] && ! grep -qxF "$INTERFACE" "$SHADOW_RUN/wan_networks"
+}
+
+shadow_heal() {
+	[ -e "$SHADOW_RUN/active" ] || return 0
+	# the fw4 reload of our own apply: it sets up everything itself
+	[ -z "$SHADOW_APPLYING" ] || return 0
+
+	[ -d /var/lock ] || mkdir -p /var/lock
+	exec 9>>"$SHADOW_LOCK" || return 0
+	if ! flock -n 9; then
+		# the lock holder is changing things right now: it needs to look again only when something broke
+		shadow_table_ok && shadow_rule_ok 4 && shadow_route_ok 4 &&
+			! { [ "$1" = --iface ] && shadow_wan_dns_changed; } && ! shadow_lan_side "$1" && return 0
+		touch "$SHADOW_RUN/pending"
+		flock -n 9 || return 0
+	fi
+	# teardown removes "active" first; re-check now that we own the lock
+	[ -e "$SHADOW_RUN/active" ] || { flock -u 9; return 0; }
+
+	if ! shadow_table_ok && [ -s "$SHADOW_RUN/table.nft" ]; then
+		if nft -f "$SHADOW_RUN/table.nft"; then
+			shadow_ssh_addr
+			logger -t shadow-vpn -p daemon.warn "restored the nft table after a firewall flush"
+			shadow_hup_dnsmasq
+		fi
+	fi
+	shadow_rules
+
+	# a WAN DNS change needs a re-render; a "pending" left meanwhile needs a converge too
+	if [ -e "$SHADOW_RUN/pending" ] || { [ "$1" = --iface ] && shadow_wan_dns_changed; }; then
+		flock -u 9
+		/usr/libexec/shadow-vpn/job converge >/dev/null 2>&1
+		return 0
+	fi
+	flock -u 9
+	! shadow_lan_side "$1" || /usr/libexec/shadow-vpn/apply lan-check >/dev/null 2>&1
+}
+
+shadow_heal "$@"

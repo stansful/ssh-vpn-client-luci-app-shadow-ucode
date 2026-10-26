@@ -1,0 +1,12 @@
+# Text files are stored and checked out with LF, whatever core.autocrlf says.
+* text=auto eol=lf
+
+# Fixtures whose CR bytes are what the tests check: never converted (core.autocrlf=input would turn their
+# CRLF into LF on the first commit, and the CRLF cases would silently stop being tested).
+#   edge.po        po2lmo's "CRLF line" entry (tests/unit/packaging/po2lmo_test.sh)
+#   ssh/logs/*.log real `ssh -E` output with CRLF lines (tests/unit/ssh_test.uc)
+tests/unit/packaging/edge.po -text
+tests/unit/ssh/logs/*.log -text
+
+# compiled LuCI catalogs (po2lmo output)
+*.lmo binary

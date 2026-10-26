@@ -1,0 +1,32 @@
+#!/bin/sh
+# procd command of the ssh instance (DESIGN §8.2): ssh-run <sid>
+#
+# shadow-vpn.ssh decides (fatal flag, the previous run's log, backoff, server address); this
+# wrapper only waits and execs, so the instance ends up being ssh itself and nothing stays
+# resident. The answers come back on fd 3, never mixed with anything printed on stdout.
+
+SID=$1
+
+step() {
+	/usr/bin/ucode -S -e 'import { step } from "shadow-vpn.ssh"; exit(step(ARGV[0], ARGV[1]));' "$1" "$SID" 3>&1 >&2
+}
+
+# A TERM from procd while waiting ends the wait too, instead of leaving the sleep behind.
+pause() {
+	trap 'kill $! 2>/dev/null; exit 143' INT TERM
+	sleep "$1" &
+	wait $!
+	trap - INT TERM
+}
+
+delay=$(step plan) || {
+	logger -t shadow-vpn -p daemon.err "ssh-run: could not plan the connection"
+	pause 60
+	exit 1
+}
+
+[ "$delay" = fatal ] && exec sleep 2147483647
+[ "$delay" -gt 0 ] 2>/dev/null && pause "$delay"
+
+cmd=$(step launch) || exit 1
+eval "$cmd"

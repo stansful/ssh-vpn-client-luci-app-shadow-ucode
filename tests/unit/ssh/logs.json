@@ -1,0 +1,668 @@
+{
+	"about": "ssh -E logs and what classify() must make of them; lab-*.log come from reports/ssh-mode.md section 5.",
+	"cases": [
+		{
+			"name": "lab auth without askpass",
+			"expect": {
+				"code": "auth",
+				"fatal": true,
+				"message": "SSH authentication failed: password auth rejected"
+			},
+			"file": "lab-t1_noaskpass.log",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "lab session with a refused channel",
+			"expect": {
+				"code": "dropped",
+				"fatal": false,
+				"message": "SSH transport closed."
+			},
+			"file": "lab-t2_askpass.log"
+		},
+		{
+			"name": "lab changed host key (known_hosts file)",
+			"expect": {
+				"code": "hostkey",
+				"fatal": true,
+				"message": "SSH host key verification failed."
+			},
+			"file": "lab-t3_mismatch.log"
+		},
+		{
+			"name": "lab unknown host key",
+			"expect": {
+				"code": "hostkey",
+				"fatal": true
+			},
+			"file": "lab-t4_unknown.log"
+		},
+		{
+			"name": "lab -D port busy after login",
+			"expect": {
+				"code": "port_busy",
+				"fatal": false,
+				"message": "Local SOCKS port 127.0.0.1:12346 is already in use."
+			},
+			"file": "lab-t5_busy.log"
+		},
+		{
+			"name": "lab refused",
+			"expect": {
+				"code": "refused",
+				"fatal": false,
+				"message": "connect ECONNREFUSED 127.0.0.1:22999"
+			},
+			"file": "lab-t6a.log"
+		},
+		{
+			"name": "lab closed before identification",
+			"expect": {
+				"code": "closed",
+				"fatal": false,
+				"message": "Socket closed before SSH identification."
+			},
+			"file": "lab-t6b.log"
+		},
+		{
+			"name": "lab closed before identification (2)",
+			"expect": {
+				"code": "closed",
+				"fatal": false,
+				"message": "Socket closed before SSH identification."
+			},
+			"file": "lab-t6c.log"
+		},
+		{
+			"name": "lab key rejected",
+			"expect": {
+				"code": "auth",
+				"fatal": true,
+				"message": "SSH authentication failed: private-key auth rejected"
+			},
+			"file": "lab-t7.log",
+			"ctx": {
+				"server": {
+					"auth": "key",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "lab encrypted key with BatchMode",
+			"expect": {
+				"code": "auth",
+				"fatal": true
+			},
+			"file": "lab-t7b.log",
+			"ctx": {
+				"server": {
+					"auth": "key",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "lab password rejected",
+			"expect": {
+				"code": "auth",
+				"fatal": true
+			},
+			"file": "lab-t8.log",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "lab session ended",
+			"expect": {
+				"code": "dropped",
+				"fatal": false
+			},
+			"file": "lab-t9a.log"
+		},
+		{
+			"name": "lab pin mismatch",
+			"expect": {
+				"code": "hostkey",
+				"fatal": true,
+				"message": "SSH server fingerprint mismatch: expected SHA256:zQPPYm7PcpE+s3b+gG2tPpELCQBon7uHxWXls4bYoUw, got SHA256:1Vm68wGq7uh5BymK4W7Mb5sdNSg1lHJAyjoYrPDLGWw (ssh-ed25519)."
+			},
+			"file": "lab-t9b.log",
+			"ctx": {
+				"hostkey": {
+					"kind": "pin_mismatch",
+					"expected": "SHA256:zQPPYm7PcpE+s3b+gG2tPpELCQBon7uHxWXls4bYoUw",
+					"got": "SHA256:1Vm68wGq7uh5BymK4W7Mb5sdNSg1lHJAyjoYrPDLGWw",
+					"type": "ssh-ed25519"
+				}
+			}
+		},
+		{
+			"name": "lab changed host key (TOFU)",
+			"expect": {
+				"code": "hostkey",
+				"fatal": true,
+				"message": "SSH server host key does not match the key Shadow trusted on its first connection to vpn.example.com:22: expected SHA256:6aELxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, got SHA256:pcl39CuIpRa79PZ3qdUMCirkXclIr+wxXIze7RGkrOs (ssh-ed25519). Shadow stopped so nothing is sent to a server that may be an impostor. If the server's key was changed on purpose, paste the new fingerprint into the server's Fingerprint field."
+			},
+			"file": "lab-t9b.log",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				},
+				"hostkey": {
+					"kind": "changed",
+					"expected": "SHA256:6aELxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+					"got": "SHA256:pcl39CuIpRa79PZ3qdUMCirkXclIr+wxXIze7RGkrOs",
+					"type": "ssh-ed25519"
+				}
+			}
+		},
+		{
+			"name": "lab closed by the server after login",
+			"expect": {
+				"code": "dropped",
+				"fatal": false
+			},
+			"file": "lab-t10.log"
+		},
+		{
+			"name": "lab killed after login",
+			"expect": {
+				"code": "dropped",
+				"fatal": false
+			},
+			"file": "lab-t10b.log"
+		},
+		{
+			"name": "lab keepalive timeout",
+			"expect": {
+				"code": "dead_link",
+				"fatal": false,
+				"message": "SSH keepalive timed out: nothing received from the server for 45 s."
+			},
+			"file": "lab-t10c.log",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "lab encrypted PKCS#8 key login",
+			"expect": {
+				"code": "dropped",
+				"fatal": false
+			},
+			"file": "lab-fmt_rsa_pkcs8_enc.log"
+		},
+		{
+			"name": "lab musl NXDOMAIN",
+			"expect": {
+				"code": "dns",
+				"fatal": false,
+				"message": "getaddrinfo ENOTFOUND nope.invalid"
+			},
+			"file": "lab-cls-dns.log"
+		},
+		{
+			"name": "lab wrong passphrase text",
+			"expect": {
+				"code": "key",
+				"fatal": true,
+				"message": "SSH authentication failed: Unable to load SSH private key because the passphrase is wrong."
+			},
+			"file": "lab-cls-key.log"
+		},
+		{
+			"name": "lab musl connect timeout",
+			"expect": {
+				"code": "timeout",
+				"fatal": false,
+				"message": "SSH TCP connect timeout for vpn.example.com:22."
+			},
+			"file": "lab-cls-timeout.log",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "lab host key type not offered",
+			"expect": {
+				"code": "negotiate",
+				"fatal": true,
+				"message": "No compatible SSH server host key algorithm."
+			},
+			"file": "lab-hk-negotiate.log"
+		},
+		{
+			"name": "lab unknown RSA host key",
+			"expect": {
+				"code": "hostkey",
+				"fatal": true
+			},
+			"file": "lab-hk-unknown-rsa.log"
+		},
+		{
+			"name": "lab password via askpass rejected",
+			"expect": {
+				"code": "auth",
+				"fatal": true
+			},
+			"file": "lab-hk-ap-pw.log",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "host unreachable",
+			"expect": {
+				"code": "unreachable",
+				"fatal": false,
+				"message": "connect EHOSTUNREACH 192.0.2.1:22"
+			},
+			"text": "ssh: connect to host 192.0.2.1 port 22: Host is unreachable\n"
+		},
+		{
+			"name": "network unreachable",
+			"expect": {
+				"code": "unreachable",
+				"fatal": false,
+				"message": "connect ENETUNREACH 192.0.2.1:22"
+			},
+			"text": "ssh: connect to host 192.0.2.1 port 22: Network unreachable\n"
+		},
+		{
+			"name": "other connect error",
+			"expect": {
+				"code": "unreachable",
+				"fatal": false,
+				"message": "connect to 192.0.2.1:22 failed: Permission denied"
+			},
+			"text": "ssh: connect to host 192.0.2.1 port 22: Permission denied\n"
+		},
+		{
+			"name": "dns try again",
+			"expect": {
+				"code": "dns",
+				"fatal": false,
+				"message": "getaddrinfo EAI_AGAIN vpn.example.com"
+			},
+			"text": "ssh: Could not resolve hostname vpn.example.com: Try again\n",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "banner timeout",
+			"expect": {
+				"code": "timeout",
+				"fatal": false,
+				"message": "Timed out waiting for SSH identification."
+			},
+			"text": "Connection timed out during banner exchange\nConnection to 192.0.2.1 port 22 timed out\n"
+		},
+		{
+			"name": "packet timeout",
+			"expect": {
+				"code": "timeout",
+				"fatal": false,
+				"message": "Timed out waiting for SSH packet."
+			},
+			"text": "Connection to 192.0.2.1 port 22 timed out\n"
+		},
+		{
+			"name": "KnownHostsCommand failed",
+			"expect": {
+				"code": "hostkey",
+				"fatal": true,
+				"message": "SSH host key could not be checked because the host-key helper failed."
+			},
+			"text": "KnownHostsCommand-ORDER /usr/libexec/shadow-vpn/ssh-hostkey ORDER failed, status 1\nKnownHostsCommand failed\n"
+		},
+		{
+			"name": "kex mismatch is temporary",
+			"expect": {
+				"code": "negotiate",
+				"fatal": false,
+				"message": "No compatible SSH kex algorithm."
+			},
+			"text": "Unable to negotiate with 192.0.2.1 port 22: no matching key exchange method found. Their offer: diffie-hellman-group1-sha1\n"
+		},
+		{
+			"name": "cipher mismatch is temporary",
+			"expect": {
+				"code": "negotiate",
+				"fatal": false,
+				"message": "No compatible SSH client-to-server encryption algorithm."
+			},
+			"text": "Unable to negotiate with 192.0.2.1 port 22: no matching cipher found. Their offer: 3des-cbc\n"
+		},
+		{
+			"name": "MAC mismatch is temporary",
+			"expect": {
+				"code": "negotiate",
+				"fatal": false,
+				"message": "No compatible SSH client-to-server mac algorithm."
+			},
+			"text": "Unable to negotiate with 192.0.2.1 port 22: no matching MAC found. Their offer: hmac-md5\n"
+		},
+		{
+			"name": "too many authentication failures",
+			"expect": {
+				"code": "auth",
+				"fatal": true
+			},
+			"text": "Received disconnect from 192.0.2.1 port 22:2: Too many authentication failures\nDisconnected from 192.0.2.1 port 22\n",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "reset before login",
+			"expect": {
+				"code": "closed",
+				"fatal": false,
+				"message": "read ECONNRESET"
+			},
+			"text": "Connection reset by 192.0.2.1 port 22\n"
+		},
+		{
+			"name": "closed before login",
+			"expect": {
+				"code": "closed",
+				"fatal": false,
+				"message": "SSH server disconnected."
+			},
+			"text": "Connection closed by 192.0.2.1 port 22\n"
+		},
+		{
+			"name": "killed while connecting",
+			"expect": {
+				"code": "closed",
+				"fatal": false,
+				"message": "SSH transport closed."
+			},
+			"text": "Killed by signal 15.\n"
+		},
+		{
+			"name": "unreadable key file",
+			"expect": {
+				"code": "key",
+				"fatal": true,
+				"message": "SSH authentication failed: Unable to load SSH private key. Check the key format and passphrase."
+			},
+			"text": "Load key \"/etc/shadow-vpn/keys/k_0123456789ab\": invalid format\nu@203.0.113.20: Permission denied (publickey).\n",
+			"ctx": {
+				"server": {
+					"auth": "key",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "key readable by others",
+			"expect": {
+				"code": "key",
+				"fatal": true,
+				"message": "SSH authentication failed: Unable to load SSH private key because its file is readable by other users."
+			},
+			"text": "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\nPermissions 0644 for '/etc/shadow-vpn/keys/k_0123456789ab' are too open.\nLoad key \"/etc/shadow-vpn/keys/k_0123456789ab\": bad permissions\n",
+			"ctx": {
+				"server": {
+					"auth": "key",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "no usable auth method",
+			"expect": {
+				"code": "auth",
+				"fatal": true,
+				"message": "SSH authentication failed: no auth method available."
+			},
+			"text": "u@203.0.113.20: Permission denied (publickey).\n",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				}
+			}
+		},
+		{
+			"name": "first auth rejection while reconnecting retries",
+			"expect": {
+				"code": "auth",
+				"fatal": false,
+				"message": "SSH authentication failed: password auth rejected"
+			},
+			"text": "u@203.0.113.20: Permission denied (publickey,password).\n",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				},
+				"reconnecting": true,
+				"prev_code": "timeout"
+			}
+		},
+		{
+			"name": "second auth rejection in a row while reconnecting stops",
+			"expect": {
+				"code": "auth",
+				"fatal": true
+			},
+			"text": "u@203.0.113.20: Permission denied (publickey,password).\n",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				},
+				"reconnecting": true,
+				"prev_code": "auth"
+			}
+		},
+		{
+			"name": "wrong passphrase of an OpenSSH key",
+			"expect": {
+				"code": "key",
+				"fatal": true,
+				"message": "SSH authentication failed: Unable to load SSH private key because the passphrase is wrong."
+			},
+			"text": "u@203.0.113.20: Permission denied (publickey).\n",
+			"ctx": {
+				"server": {
+					"auth": "key",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				},
+				"asked": {
+					"kind": "passphrase",
+					"missing": false
+				},
+				"key_format": "openssh",
+				"reconnecting": true
+			}
+		},
+		{
+			"name": "passphrase of a PEM key asked, then rejected",
+			"expect": {
+				"code": "auth",
+				"fatal": true,
+				"message": "SSH authentication failed: private-key auth rejected, or the key passphrase is wrong."
+			},
+			"text": "u@203.0.113.20: Permission denied (publickey).\n",
+			"ctx": {
+				"server": {
+					"auth": "key",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				},
+				"asked": {
+					"kind": "passphrase",
+					"missing": false
+				},
+				"key_format": "pem"
+			}
+		},
+		{
+			"name": "passphrase missing",
+			"expect": {
+				"code": "key",
+				"fatal": true,
+				"message": "SSH authentication failed: Unable to load SSH private key because it is protected with a passphrase, and none was provided."
+			},
+			"text": "u@203.0.113.20: Permission denied (publickey).\n",
+			"ctx": {
+				"server": {
+					"auth": "key",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				},
+				"asked": {
+					"kind": "passphrase",
+					"missing": true
+				},
+				"reconnecting": true
+			}
+		},
+		{
+			"name": "password missing",
+			"expect": {
+				"code": "auth",
+				"fatal": true,
+				"message": "SSH password is unavailable."
+			},
+			"text": "u@203.0.113.20: Permission denied (publickey,password).\n",
+			"ctx": {
+				"server": {
+					"auth": "password",
+					"host": "vpn.example.com",
+					"port": 22,
+					"keepalive": 15
+				},
+				"asked": {
+					"kind": "password",
+					"missing": true
+				},
+				"reconnecting": true
+			}
+		},
+		{
+			"name": "session whose log was capped",
+			"expect": {
+				"code": "dropped",
+				"fatal": false,
+				"message": "SSH transport closed."
+			},
+			"text": "channel 7: open failed: connect failed: Connection refused\n",
+			"ctx": {
+				"session": true
+			}
+		},
+		{
+			"name": "a channel error after login is not an auth error",
+			"expect": {
+				"code": "dropped",
+				"fatal": false
+			},
+			"text": "Authenticated to 203.0.113.20 ([203.0.113.20]:22) using \"password\".\nchannel 3: open failed: connect failed: Permission denied\nConnection to 203.0.113.20 closed by remote host.\n"
+		},
+		{
+			"name": "keepalive follows the server setting",
+			"expect": {
+				"code": "dead_link",
+				"fatal": false,
+				"message": "SSH keepalive timed out: nothing received from the server for 60 s."
+			},
+			"text": "Authenticated to 203.0.113.20 ([203.0.113.20]:22) using \"password\".\nTimeout, server 203.0.113.20 not responding.\n",
+			"ctx": {
+				"server": {
+					"keepalive": 20
+				}
+			}
+		},
+		{
+			"name": "host key changed during rekey",
+			"expect": {
+				"code": "hostkey",
+				"fatal": true
+			},
+			"text": "Authenticated to 203.0.113.20 ([203.0.113.20]:22) using \"password\".\nNo ED25519 host key is known for shadow-s_0123456789ab and you have requested strict checking.\nHost key verification failed.\n"
+		},
+		{
+			"name": "empty log",
+			"expect": {
+				"code": "unknown",
+				"fatal": false,
+				"message": "SSH exited without an error message."
+			},
+			"text": ""
+		},
+		{
+			"name": "unrecognised text",
+			"expect": {
+				"code": "unknown",
+				"fatal": false,
+				"message": "SSH exited: something new"
+			},
+			"text": "something new\n"
+		}
+	]
+}

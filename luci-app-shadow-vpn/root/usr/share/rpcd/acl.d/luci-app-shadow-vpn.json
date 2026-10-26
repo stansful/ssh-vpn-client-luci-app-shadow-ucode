@@ -1,0 +1,27 @@
+{
+	"luci-app-shadow-vpn": {
+		"description": "Grant access to Shadow",
+		"read": {
+			"ubus": {
+				"luci.shadow-vpn": [
+					"status", "servers", "keys", "profiles", "lists", "list_view", "rules", "rules_export",
+					"leases", "job_status", "logs"
+				]
+			},
+			"uci": [ "shadow-vpn" ]
+		},
+		"write": {
+			"ubus": {
+				"luci.shadow-vpn": [
+					"set_enabled", "select", "settings_set", "check", "attention_dismiss",
+					"server_save", "server_delete", "hostkey_pin", "hostkey_forget",
+					"key_save", "key_delete", "key_show",
+					"profiles_import", "profile_rename", "profile_pin", "profile_delete", "profiles_delete_unpinned", "profile_link",
+					"list_set", "list_refresh",
+					"rule_add", "rule_set", "rule_delete", "rules_import"
+				]
+			},
+			"uci": [ "shadow-vpn" ]
+		}
+	}
+}

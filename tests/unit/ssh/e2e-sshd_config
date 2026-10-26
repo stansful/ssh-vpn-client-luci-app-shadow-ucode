@@ -1,0 +1,14 @@
+# sshd of tests/unit/ssh/e2e.sh: the lab's tests/lab/files/vpn/sshd_config with the e2e user.
+Port 22
+PermitRootLogin no
+PubkeyAuthentication yes
+PasswordAuthentication yes
+KbdInteractiveAuthentication no
+AuthorizedKeysFile .ssh/authorized_keys
+AllowTcpForwarding yes
+GatewayPorts no
+X11Forwarding no
+PermitTunnel no
+ClientAliveInterval 15
+ClientAliveCountMax 3
+AllowUsers tunnel

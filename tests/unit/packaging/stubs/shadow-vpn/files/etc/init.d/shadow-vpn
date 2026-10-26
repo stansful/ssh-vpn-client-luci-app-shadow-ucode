@@ -1,0 +1,13 @@
+#!/bin/sh /etc/rc.common
+# Test stub, used only while the runtime's init script does not exist: records calls, arms nothing.
+
+START=95
+USE_PROCD=1
+
+start_service() {
+	echo "init start enabled=$(uci -q get shadow-vpn.main.enabled)" >> /tmp/shadow-vpn-stub.log
+}
+
+stop_service() {
+	echo "init stop" >> /tmp/shadow-vpn-stub.log
+}

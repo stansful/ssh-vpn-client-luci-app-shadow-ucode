@@ -1,0 +1,2 @@
+# Shadow: accept connections nft tproxy delivered to xray (mark set in table inet shadow_vpn)
+meta mark & 0x00400000 == 0x00400000 accept

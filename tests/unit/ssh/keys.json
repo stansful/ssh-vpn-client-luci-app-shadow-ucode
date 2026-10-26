@@ -1,0 +1,244 @@
+{
+	"about": "Throwaway keys for keys.normalize() and the ssh e2e test. Encrypted ones use the passphrase below. Never used anywhere else.",
+	"passphrase": "correct horse",
+	"keys": {
+		"desktop_ed25519": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ed25519 (defaults: aes256-ctr, bcrypt, 24 rounds)",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABCMjoXTIq\n5KFfvpkyzr/8pHAAAAGAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIICnEGHs7nq2sw+8\n0Q1Z9lrbyRIbnWSRVZR7PqxbERaHAAAAoBuuHwMC/Ln5Ta2EPnLPaTP98e8TH4Wsu56Xdf\naMKWkFVRISgiAc9Tpcj4ut3OlUA2v4TTu5AY072nGia2Qa/uN2YdmVGh9JesCUlN8Ekcdw\nEpgSxOFZtegvOJtS/IUaC4RcQFS/7tkXKma/iM8Mv1BNqTNP0ajDIGvmBnYsp1PeYEroYc\n3yUEwUCthqRPfyc2dji7sjIv6dR0VGxyxjK+c=\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ed25519",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIICnEGHs7nq2sw+80Q1Z9lrbyRIbnWSRVZR7PqxbERaH",
+			"passphrase": true
+		},
+		"desktop_rsa": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t rsa -b 2048 -a 2",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABD4xKpHOy\nHoAOV+3PTVhnzMAAAAAgAAAAEAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQDXiZsML6Eg\na15UGK5lmvd2qWP/qJOtH+r/VMLKvJ+OcKHB/H7q9+YNgb3AlK2QslCwKPw2q8EdQr/7eB\ni3CzuOTBh1sEP1YqbFVOxSRhA6lTP9M1dpyY37cuswcyjfhN4dnYbQwlHkGaFt6zk0510i\nylEXhYxqOpfKTzbaeEbB5jcD/eG8MT4lvHW7Zz7c8HiqO1+bajgL2rP/9T/9oGCJNfN+kK\njz5TqnCRIgTb70BHZ5G2dQhhOgrP1TPk2hWMLR4iz23vxXXVvCwYFUxV+EmODWqQrlOfVr\nm9ImP7BZ1c3tIfTQHNWOMZcmXEiGqymFzXAETlDOCL7cVAVmTOtTAAAD0BIh3c0bG2h1DO\n+0P9GHWuJLgOm9hF1BxW+n9Hhpqn2OnI8NQXBfWXgGs5gSKJWkgDaqaK49jQyaArFT8gdp\nUPdPGbO7UqTJcqe+c06E/VijLedWbnuc3Rwl5mhGuXc88jo49M2Ma+/TG++ZytbsruGl1j\ndjm+mmsFIwUzh0uPBoM8q7oJlVEGnMkG9oGnEKYTF9bJLrPA629mPZ5fUmfcwAcdugqFqI\nsq5I/41Ky43dukiDF1I4zIfMphDV1FZ0Yme10gtSpBqO60ef511daI7lu2LyKjSASCygd/\nxpnK7IWfIgXFGAdKUoBpy2n1b9Vy3gq3rJqCntKt3WTYA377RsT6bLj6C5pWRLTUAoKx9o\nE2W0QClA0UysuKg8F+7Qx1VvY6Bkwu5FcYnAgFF8xGsSiDZu752jPJAvngwfDKGmkbALHU\nSFmnk4L/ANlavuMsl20Jd65hSFhzP1PFOhvucujiRJNUcyu/X1NLsu2dPB3tNz3OOk1K7e\n8u95F+uFgzX0TTjZPMW5q3DHgnmPhGk3pcJ+1rcdxW/AAVME3TWbwsaiyjUFJhIOjkFBA6\nhlKssbg9qfZ9vvtaSNjt6miPeVKPWA4Ny0P7IL8R61ts2pg0xQOxEk6pSOJi40PMeSWWCa\nIPHCBT3dICuqP0iWXmLjWY7+WLTfwszlX76em9SwySc0TZpCMFSWo5MFIyYgrC+DQ+CPKy\nWq+F/UpoNWQHBIsAjQg8Csf351dvujH3AZ0ivuBZU5EULKDuigigd2SOYtkiduHuvO0JGC\n4u5AqkaKSw7yK446GvoK1GAPOncxAM7BXNWCpYBRocYYhdoMcAFawY++Jlgf08A/L8etT9\n/6lKhd57ZMqo916CX9be3eIdLZG0enR/YwuNxI3/agT1mIY4DcVbBgTOzYkYWzZafJw/Bg\nTqykW6v4VbpeAv31qRmuR0jogtj4ndalaufzh1yh0UYgn2TlxDMXhT1JNi/KQBIvLVlpV3\nE3ZuHgywfbnZSwoiqqerFrlZPrkZRqn2rY+HLuvT3YSI37oIFcZUo0+LgSGdI/M+DM/BiY\nMov1H6pQD1QrWoUvplm0me1xNBI9VoAv4Ip3LrHcQlJZi5LdvHodjDui727HQma2GLvRRW\nRWDnxSw0187eykJxlb/IL+Nt/3TiCrrUgmFkgI7TUMtBtYoKCprhKwHDJKr948YM3DS1lq\nY4Xdg8oEyVdUdBCdZxXX87PI0KEY9qxpU5VGvDWnHQNXBbclf7kSTGDVw4F+md8l9CeUCC\nZtnOgdl8bKG0IjwSkdc/US/pYEMFg=\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "rsa",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXiZsML6Ega15UGK5lmvd2qWP/qJOtH+r/VMLKvJ+OcKHB/H7q9+YNgb3AlK2QslCwKPw2q8EdQr/7eBi3CzuOTBh1sEP1YqbFVOxSRhA6lTP9M1dpyY37cuswcyjfhN4dnYbQwlHkGaFt6zk0510iylEXhYxqOpfKTzbaeEbB5jcD/eG8MT4lvHW7Zz7c8HiqO1+bajgL2rP/9T/9oGCJNfN+kKjz5TqnCRIgTb70BHZ5G2dQhhOgrP1TPk2hWMLR4iz23vxXXVvCwYFUxV+EmODWqQrlOfVrm9ImP7BZ1c3tIfTQHNWOMZcmXEiGqymFzXAETlDOCL7cVAVmTOtT",
+			"passphrase": true
+		},
+		"desktop_ecdsaP256": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ecdsa -b 256 -a 2",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABCchAlM3a\ncKzmZwH/zmHiDMAAAAAgAAAAEAAABoAAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlz\ndHAyNTYAAABBBNyZJ7Ec2zuu0/Pj3Kn8tsOHgvQvXX4TC15QiCbhVqUUxcYrGoqKmHhhVl\naEv3m/fDkCRh8Rm3Kh7BjPtDLS7g0AAACwcljX/sK6jXR2HX0G3h345v5dqOR61lLkGYoL\nFAMt8J5Yfanrct2XR87hYwkBL1GxPX25D9uY+fvwHF1CsQLCQQlU2WYu+lL4al8iRhMAMi\nDQO22vzEqgM2L4ZflHgA6VyAVtM1++vYN9C9bETezc4/PuJMwhO8Hk6hx5YeR17+g0kYdi\nTINGF6ROb+drnBrhN6677weV+GG9pE21kJNOV8Y+7aaHnHNvvwxx3TYWt8Y=\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ecdsa",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNyZJ7Ec2zuu0/Pj3Kn8tsOHgvQvXX4TC15QiCbhVqUUxcYrGoqKmHhhVlaEv3m/fDkCRh8Rm3Kh7BjPtDLS7g0=",
+			"passphrase": true
+		},
+		"desktop_ecdsaP384": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ecdsa -b 384 -a 2",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABC2jn84op\nVt8wPIW7UaYs3/AAAAAgAAAAEAAACIAAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlz\ndHAzODQAAABhBJhDBQPkLVRnkO2AVXR0pZhltibDmiODyg5bnW0vEsfjTdFzHVIeYMCo7O\nY/u5rRxyujgKoyLOzmqAUM2htXM0bDPW/3Ke2keDiAnB7TXQ5tsWuc6EdJzPT/jnGlNHad\nlAAAAOBKs9aGsMI9NwdUQR+6XOBNYauvJ4IncKRz9+qdk7MUQ1hPrL4d+nOtvfGlCqMz8O\nyc5Pp0FflzaqSNiHpX1kOXiISAqFvUiqhgNvh7y87ES2IqebPhlC29ZV5OANCdK3988ak2\nxKchLXjoAJR4Tj+qhto0erb/3kEgnuHa7VjcMLI8H1DmuP5ybdiv5dM+xFbq3Bci0vXclL\nf+aFE8byBHj2siJenn5NAPkGexAnlfw1S9tGYLAYqzrMDz22ot+du0B7nVV9S0UXsLaVdW\nd+BTpUiYxavKv0556URjStXQUA==\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ecdsa",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzODQAAABhBJhDBQPkLVRnkO2AVXR0pZhltibDmiODyg5bnW0vEsfjTdFzHVIeYMCo7OY/u5rRxyujgKoyLOzmqAUM2htXM0bDPW/3Ke2keDiAnB7TXQ5tsWuc6EdJzPT/jnGlNHadlA==",
+			"passphrase": true
+		},
+		"desktop_ecdsaP521": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ecdsa -b 521 -a 2",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABCpoEZBU8\nCnbNAicGSu1M7AAAAAAgAAAAEAAACsAAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlz\ndHA1MjEAAACFBAAzPqqkWPGdziyik7IcMlPbxKQUThvlcOZi1s30raL8fo+s3s+tOSVmES\nuW4AqsxFU3U3TnRrs5KwNBBry6dPCSZQDKGjYzWiJXQ5lHhhBn3mvYRIW1lNskJWke39fB\nVvvLYFkO+8DLcxwUB46KxIQ/3Q6U6hUu8Un28nQ+XVYkkV9P8wAAARC+KrfkvFDIZPhpgJ\naPE2QUWmgbHJ3Zw3M+M9GKcLyuf54IrneCJ0Von/WNIxW59TRg1MDaKfmdnHev6B0U7FK1\niGUQv/nXeYnBLY7vmwWGpFAtyti6X/1IyHTFelM5mNiOlJXGLfcVGiXoVtHcaVdGXJ2F/O\nPaLTA/D/H5UdtVqBD1SJk3vuoApI48eWg5LeBA8oKZ2SJL4yiiQfDWbhR8z9f9YuIjT5B5\nQH2yLWSDhISoW9QC89eToM/2ajyhQpG6tjlDaIKfPjcd5+DkLPIX0S1RuxOv86txGBduGa\nk0bAGWDdEIoN1j2DbaSzBz8A/jZDv52vs0b+Kc5CIfWVRS//00LaXcbnQm08MReAlILQ==\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ecdsa",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAAzPqqkWPGdziyik7IcMlPbxKQUThvlcOZi1s30raL8fo+s3s+tOSVmESuW4AqsxFU3U3TnRrs5KwNBBry6dPCSZQDKGjYzWiJXQ5lHhhBn3mvYRIW1lNskJWke39fBVvvLYFkO+8DLcxwUB46KxIQ/3Q6U6hUu8Un28nQ+XVYkkV9P8w==",
+			"passphrase": true
+		},
+		"desktop_ed25519Aes128Ctr": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ed25519 -a 2 -Z aes128-ctr",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFlczEyOC1jdHIAAAAGYmNyeXB0AAAAGAAAABC/axSkYy\nQyQkW/j5sYgicGAAAAAgAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIPjS9RAConW5JCWI\nNa9YOi4yh5co3K4ahFCG7QGZ3b37AAAAoKi8DUD5hu8jUURUpwaKRLxr50bIffYUFwP6oA\n/XvsY1AQbRHUKc8jiew4n7884Mf8sl3Wnmu6SIAJGqo6BFCHTwDnuJgJ4LFfXL/G/DaKg4\nhStpRfpCnQWqoDsbTRsckb+yTwCatU5BN1NRmNSq9qRni7m7bA0BWK/24ETAgB/ORA4+oN\n00QKe5MCcxIDhrC0+/O3Hb/PZwScdLo8bdanE=\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ed25519",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPjS9RAConW5JCWINa9YOi4yh5co3K4ahFCG7QGZ3b37",
+			"passphrase": true
+		},
+		"desktop_ed25519Aes256Cbc": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ed25519 -a 2 -Z aes256-cbc",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jYmMAAAAGYmNyeXB0AAAAGAAAABCwbS9nRj\nTKQeuSmNeeP3RNAAAAAgAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIBonvbXy2ARtnNoB\nIRBV4L4uEqNTS2tQIH3GfiRnPWUxAAAAoOjMZ4O5qqn4a1imzMS95bkXqdKfku6/E61dJf\ntwvf0c0HjTtugWo6sGWDvJmKnFkYS4fLibazCYLZHQgYYqUdTRm7p+0cLenc/1lsjNNLVH\nLHKXTA9DcN9nTfH/x9VffSwrITZ0CGk2yeilBq0G2ws5zATOS9Psk02NRpfs7e5FTNVI7N\nPjWLWZJLZyjDCLOM32DS7dPw1nKIA5QB2QUdU=\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ed25519",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBonvbXy2ARtnNoBIRBV4L4uEqNTS2tQIH3GfiRnPWUx",
+			"passphrase": true
+		},
+		"desktop_ed25519Aes256Gcm": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ed25519 -a 2 -Z aes256-gcm@openssh.com",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAAFmFlczI1Ni1nY21Ab3BlbnNzaC5jb20AAAAGYmNyeXB0AA\nAAGAAAABCDif2KYN5r2z/QTI5GafYFAAAAAgAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAA\nIDC1BbPk92vtislaKjnLlBONyCfgV3ZzZfISwI4TYS0uAAAAoNC1i/L2LkVWQ+5gr1bIIR\nsh1tgXD6nzPpOXNCdBYEq3kig4pD7qm74lZn09VY+9nkxcf5njvfQQdOn49XdoScZVq+ag\nxlUVGlg0zJPE4s2iuz3iFJd/DXpiL3VX6pDU2VBn3UBNPFLhWhetSvJF4g8MBMQPDy7Gs1\n5hvwPyfCzrF2KmJ0t+nd/ELcKiypXWmQLPzAGXUAUWCZT751WN5GRPs3PFUUYVJmdjOfgv\nhIoy\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ed25519",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDC1BbPk92vtislaKjnLlBONyCfgV3ZzZfISwI4TYS0u",
+			"passphrase": true
+		},
+		"desktop_ed25519ChaCha20Poly1305": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ed25519 -a 2 -Z chacha20-poly1305@openssh.com",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAAHWNoYWNoYTIwLXBvbHkxMzA1QG9wZW5zc2guY29tAAAABm\nJjcnlwdAAAABgAAAAQpQUdLU6I1kB9VAyNC+tCWwAAAAIAAAABAAAAMwAAAAtzc2gtZWQy\nNTUxOQAAACBfQ8l9ROj7IMumKovJA0Dx8is3RAgro+l4YGm/VNaPEQAAAJhtcF/v0AF3Y5\nuF7MNukkK5r8ToO1pHAHM+kxmRftJMmfUCgPMM2tanDgBc882XkcbVvuCU4clIem4oS8co\nelcVpXR0jTLvQMT9tT5ooW8ALIcTktvSOuo6ioRkefiJz5+1vlW3zayhswsGcTMVi3umXD\n2eT0NlOOO5owOG8e5nSLvkunix+5X3HYx06D2t64/46gSyFe5C5NyK3oXOEtWih007fNnN\nobk=\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ed25519",
+				"format": "openssh",
+				"encrypted": true
+			},
+			"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF9DyX1E6Psgy6Yqi8kDQPHyKzdECCuj6Xhgab9U1o8R",
+			"passphrase": true
+		},
+		"desktop_ecdsaP256Unencrypted": {
+			"made": "desktop tests/ssh-key-fixtures.ts: ssh-keygen -t ecdsa -b 256 -N ''",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS\n1zaGEyLW5pc3RwMjU2AAAACG5pc3RwMjU2AAAAQQRgeJOhs8F+EVb5yijyHDOtjw5Rzmtu\ngMoeqWIz66VjyUxYK7/Ui6imTdbfFT6xEi2njE7J5oosAx8EFmNxDpuVAAAAsFmxvytZsb\n8rAAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGB4k6GzwX4RVvnK\nKPIcM62PDlHOa26Ayh6pYjPrpWPJTFgrv9SLqKZN1t8VPrESLaeMTsnmiiwDHwQWY3EOm5\nUAAAAgByfvxyC2DYsaVz1LEhCgF/ivrmh/npxy0V5opAizhUAAAAATZml4dHVyZS1lY2Rz\nYS1wbGFpbgECAwQF\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"type": "ecdsa",
+				"format": "openssh",
+				"encrypted": false
+			},
+			"public": "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGB4k6GzwX4RVvnKKPIcM62PDlHOa26Ayh6pYjPrpWPJTFgrv9SLqKZN1t8VPrESLaeMTsnmiiwDHwQWY3EOm5U="
+		},
+		"rsa_pkcs1": {
+			"made": "openssl genrsa -traditional 2048, OpenSSL 3.5.9",
+			"text": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAxGxYbg4ni9UtW9MVx+nTiEYqLzoq2UFrYsm7Fk7vmIyV27gS\nBRZmAvNE2QM5MBLxjjHwlreFgzgBUjaKU19qZYuo9iA6KewVW/pIg6InTxOdFeHI\nWOQlgpTe2vB3JZpRDwRaxPXLbY7BSbSdYEy/JAi2jpUIEFvy2e+ZM2XSlBBm6Pt+\nhAxpGpuOGw48uUB0cgcnPL1YwbgQ2D8+mgPTPZ/R2RZFbmgsnC1CXMMIFfHsgHF6\nHoC04mQkVwDLMECfkLUxO5tmfamomJX1e4SmLry1up2FMvdpi+IVU9L3BvdJji5J\nvLYsv5H/pUoQkvYruBCMhpS8ofU8nKv0epI+PwIDAQABAoIBAByiuFL1yKQlJE4N\nEabUcEdKBgpejjKgIUSvU5Fmrp1sbsiFJvNg7DxP34tNDKr1Mra1PHWXNGVd5oC9\nfMsMz65q1EDAOq/elXqURrq8tW2yK/uDBWSYK4kZpP0Bg409gxsPr8qjvtAuY1Vt\nzxJj/esF7ioOkLS52EdsxnFCI0H8ehxJKSRmqjVw+48lQbSvjA5cHS+CS/X7Wpcr\n7CU7NdKM80yg0T0ZeOV05T7pigE1Nj5fSzz20tyyY11BjP68HB2CDGq2kq1UhcS2\nx8G/CGqLCyOp7lX3kXGwXn05AyPp+uPgm8A5vR7FXFQ56YFLcDlJUQNdoX/lHO4r\nlkRVvKECgYEA4hC3YhYlKFcXvtFujFS1ACEUCC0xzUXl3wL4UATnJtLoIXmk7Wpi\nTZkJYf6dxsMDxrGzKPuUt8wZA+1XmfO5Ypy46YjseYxlMDl/4A29BeoyMHE/Hgxc\nMdJatWE04yR05YrzxcqjRQoHvuwKgAfIrVYGHfCYUfzKwAMXVGnMhy8CgYEA3m7O\nWSylnipKwY5/oR8kJKRUFWXs5KfvAoJxVGMYgEjPqi+MsfvSn36GE3FIRLTv923e\nRmBJo4SrbE2gqkICY05CaUcEDtJeVTPH++yw+wx1Jb8ghsCzsAO3wp1YW8sUQROv\nRrwCD2nOlYd3oAi3+D24YV31yL/6ufW2Mg0J9fECgYALhkijAngAd3gpbSnSk5rq\nl8UaqZspWM/gL5mTErzp+MSGuFnVFKBQTmXxDfbjJBv0LCjzBOhO+mOoFJhrq8Ye\npdizZxyPEb4y2CuRs4GYZJkMaSmLkZu9mnivWHZGwhwHe67zvWHXaix86jGa10q+\ns2z6Z8KMI3P+l+m/jukzVwKBgEXws4OIrV7pT25DH1CLWTMIVMQRs4ZGY7n3SClP\nq4GS43FQ2D2SwCyUfRYZ9a5c8mNrsYuRdTYsXjaExjMi5FtTXUB7KwR6E11ZFdXa\nG+Akj6VZzqFwcE+1K4/PJ9xdI7Y+uUtVjJRKIcIUwYGZnDc7OQGsqL8B1pWodCyS\nuwIRAoGBAK+a08BCCnTpIvtPQA9pJ9KpFcQkikgxtQy64NhPddCWe04HzU4hX6ba\nvLUdBCG+VovPXzsxwkfGVnyFPnZoodOlTLrrH568QJ+o3teYeDyqIDXwWGUfr6Ai\nz9ocQTlubZCIuYwHbgCjdwraBO8Nbhq8b4HMg3VsSr3Y1hEsXT2f\n-----END RSA PRIVATE KEY-----",
+			"expect": {
+				"type": "rsa",
+				"format": "pem",
+				"encrypted": false
+			},
+			"public": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDEbFhuDieL1S1b0xXH6dOIRiovOirZQWtiybsWTu+YjJXbuBIFFmYC80TZAzkwEvGOMfCWt4WDOAFSNopTX2pli6j2IDop7BVb+kiDoidPE50V4chY5CWClN7a8HclmlEPBFrE9cttjsFJtJ1gTL8kCLaOlQgQW/LZ75kzZdKUEGbo+36EDGkam44bDjy5QHRyByc8vVjBuBDYPz6aA9M9n9HZFkVuaCycLUJcwwgV8eyAcXoegLTiZCRXAMswQJ+QtTE7m2Z9qaiYlfV7hKYuvLW6nYUy92mL4hVT0vcG90mOLkm8tiy/kf+lShCS9iu4EIyGlLyh9Tycq/R6kj4/"
+		},
+		"rsa_pkcs1_enc": {
+			"made": "openssl rsa -traditional -aes128, OpenSSL 3.5.9",
+			"text": "-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,2A959BA666812F50875303EEFAED54A7\n\nVlpaofAcwadU6zFFxXIZhD55Bnnh5bR4SyrA3BbFwKzK8qOelEbDa5N5+lj1DU/o\nadTYAunE6gE84st8CWCEwU2Vk055Ts13ABl4pFtORBmWLcdO7h+3WPvsOhaWCctq\nXjUqNQJT4vbw/I8ye1H9hGajkPqZvdivWGMTLgBiIGxXVTkr/bLTxixDhAgq7SZX\nKmvHJpNM1Hvcd7o+oHZ0TyqTcQ2nb9+KGet/2NyuK267t4MR8Q24F6OucLIfQWBu\n96MN3fz0WFJPgsy2cQKPVvcetTLckmO0+W0sj3ODCf/g/KJ79Rin1IeyqlMpF5uo\nihbyJqMRtLSqPwIiq9ef+dnHS2MkZ/6TBAOpYJX+kXRW7IY4eQfNcSRHxt3lU6n7\nUdcVBctoJSB8ivAmPjTRnysZN55QYkiwO8MAcsNVKgyZca+m60WHZ1WX4hhUnyWx\nPTpjYkE7E5WFWf+5MRrrp2Bh30GD5F86//x5BxvyWz8PltzDfBws0ckokY+kbSgz\nEKTKE5hcTqmksjUuz1Ojujyk1gSczi2G3t7Dmi8I51K1AaZO0NU7m6fdQiYQ5fTi\nRM5UKtqDc3NJOSuej0v4rfr/w2HaawvvkNBJH1mGBNjtov3oLr1kIvB84OCXG3lM\nJcNp/7xz+a3cLBN0QJjj4XPq0Q3Q/8ahF6ZaHOgRoAmgXn9x8qI/a4xamLe/Os40\n2Wgi9RjKo3/yWgNreR9R7Thg1fF68380WW3bs/AJW85bJ2rTtd9N3Giy7kNdFvYD\nW0Ri3GxZoXHfhxlck9gJdkh70a9c8hnJoL5EUc+6SxbfR+pN81s6KXKGbfa1Jlsy\ngzzFjYqHwJzWOozb/fYe8KGWNj5Cl63PB3+CvVuU4pOjAyg+yT/+yElAemyU3/WJ\nhGmFMG+pXXt95r1+WiVwPhnUEcE+3INFR0Pd0l4U1ZXJisXsc1ZYTeKnWhXHk8az\nlCcWDvUJ7pY2QP97BVutci9jFa6970OtJiHJSCBWacNZbM27A8dyMtfQh/oIH+Cu\nzWJGjhJMa7/WXsYFt/Gd1mKnPhIVYFZBAOhGyts5/+sFrc4EhVhtbxctnHaUm+9/\nwSpUY30T/DU/11pRphwXYwbpbi28XDmuocSmxxwAkNhxftbzpvQXyBRxvqR6NsSY\nxJusBhvRZe8d1avcdtVyITCapLMRMf0KSFpYOMT00Y6an07blL+j8HUysul/Hbzq\n+Qh+XzQEM6OQ7IR82RfJ17osaa5xTO75bRCwRn3qbUgqaPGnqdU44MZXILLMzWtu\nV5pf9UluuGXLcr7Cskx1u4kx05vxRJGravf/RSelbfLutopXlIyiOqsP4Y2Rwdg8\nD1j2WmgrlJmBVC3WJW8HqOsT3FBhS0/jKAhCWStLJwGhu22q3X1wYyR5HeZyAeAn\nzKlQd1akBt4sDgGbjaCaDMVmL9KsITb7jtHJRIq2sYWExGrfqmtq9lEOPuZwswXH\n98GWPBLPKz6aDprvG/efe1QFt8sFHKjfoJXyg2+gSXxzSw4lIzBHP60pF9dzkDYh\nYHjDh505r4uELM6WywQ0Rg64uWfWf+FvOLzB0cWz2C1lHdfC+Fm8EKpMnNfkut6r\n-----END RSA PRIVATE KEY-----",
+			"expect": {
+				"type": "rsa",
+				"format": "pem",
+				"encrypted": true
+			},
+			"public": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDEbFhuDieL1S1b0xXH6dOIRiovOirZQWtiybsWTu+YjJXbuBIFFmYC80TZAzkwEvGOMfCWt4WDOAFSNopTX2pli6j2IDop7BVb+kiDoidPE50V4chY5CWClN7a8HclmlEPBFrE9cttjsFJtJ1gTL8kCLaOlQgQW/LZ75kzZdKUEGbo+36EDGkam44bDjy5QHRyByc8vVjBuBDYPz6aA9M9n9HZFkVuaCycLUJcwwgV8eyAcXoegLTiZCRXAMswQJ+QtTE7m2Z9qaiYlfV7hKYuvLW6nYUy92mL4hVT0vcG90mOLkm8tiy/kf+lShCS9iu4EIyGlLyh9Tycq/R6kj4/",
+			"passphrase": true
+		},
+		"ec_sec1": {
+			"made": "openssl ecparam -name prime256v1 -genkey -noout, OpenSSL 3.5.9",
+			"text": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIOEXomFomFDWRV8j55vNFO4Y8qyTDkXCnbZ1KVxU1tOKoAoGCCqGSM49\nAwEHoUQDQgAEDEPBzzoTEnXMSN0W1hxPQsSp6aSblozyoFz6SU9acRL8TzYmQG3i\noidNCUxwyzcGOvg426lvVtUKN3VYMuglMw==\n-----END EC PRIVATE KEY-----",
+			"expect": {
+				"type": "ecdsa",
+				"format": "pem",
+				"encrypted": false
+			},
+			"public": "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAxDwc86ExJ1zEjdFtYcT0LEqemkm5aM8qBc+klPWnES/E82JkBt4qInTQlMcMs3Bjr4ONupb1bVCjd1WDLoJTM="
+		},
+		"ec_sec1_enc": {
+			"made": "openssl ec -aes128, OpenSSL 3.5.9",
+			"text": "-----BEGIN EC PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,FC2576037D6AF59AA43B270E9289A662\n\nCxMl2n/P2fcmn/ggfBUhscIQAPW/umST1i9s/ND9fg2L82gIOuO+9gA3+hwj+K0w\nbHyWO2eGfKbYmGlriF0Dod7cfCsztT/C+x04zd6ELFSXdw/Qh56W705aU3r6kGPh\nDeDScxhA2Xx//uK27VbgBjy8cM/haf2Bn+ZbWBYj69A=\n-----END EC PRIVATE KEY-----",
+			"expect": {
+				"type": "ecdsa",
+				"format": "pem",
+				"encrypted": true
+			},
+			"public": "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAxDwc86ExJ1zEjdFtYcT0LEqemkm5aM8qBc+klPWnES/E82JkBt4qInTQlMcMs3Bjr4ONupb1bVCjd1WDLoJTM=",
+			"passphrase": true
+		},
+		"rsa_pkcs8": {
+			"made": "openssl pkcs8 -topk8 -nocrypt (RSA), OpenSSL 3.5.9",
+			"text": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDEbFhuDieL1S1b\n0xXH6dOIRiovOirZQWtiybsWTu+YjJXbuBIFFmYC80TZAzkwEvGOMfCWt4WDOAFS\nNopTX2pli6j2IDop7BVb+kiDoidPE50V4chY5CWClN7a8HclmlEPBFrE9cttjsFJ\ntJ1gTL8kCLaOlQgQW/LZ75kzZdKUEGbo+36EDGkam44bDjy5QHRyByc8vVjBuBDY\nPz6aA9M9n9HZFkVuaCycLUJcwwgV8eyAcXoegLTiZCRXAMswQJ+QtTE7m2Z9qaiY\nlfV7hKYuvLW6nYUy92mL4hVT0vcG90mOLkm8tiy/kf+lShCS9iu4EIyGlLyh9Tyc\nq/R6kj4/AgMBAAECggEAHKK4UvXIpCUkTg0RptRwR0oGCl6OMqAhRK9TkWaunWxu\nyIUm82DsPE/fi00MqvUytrU8dZc0ZV3mgL18ywzPrmrUQMA6r96VepRGury1bbIr\n+4MFZJgriRmk/QGDjT2DGw+vyqO+0C5jVW3PEmP96wXuKg6QtLnYR2zGcUIjQfx6\nHEkpJGaqNXD7jyVBtK+MDlwdL4JL9ftalyvsJTs10ozzTKDRPRl45XTlPumKATU2\nPl9LPPbS3LJjXUGM/rwcHYIMaraSrVSFxLbHwb8IaosLI6nuVfeRcbBefTkDI+n6\n4+CbwDm9HsVcVDnpgUtwOUlRA12hf+Uc7iuWRFW8oQKBgQDiELdiFiUoVxe+0W6M\nVLUAIRQILTHNReXfAvhQBOcm0ugheaTtamJNmQlh/p3GwwPGsbMo+5S3zBkD7VeZ\n87linLjpiOx5jGUwOX/gDb0F6jIwcT8eDFwx0lq1YTTjJHTlivPFyqNFCge+7AqA\nB8itVgYd8JhR/MrAAxdUacyHLwKBgQDebs5ZLKWeKkrBjn+hHyQkpFQVZezkp+8C\ngnFUYxiASM+qL4yx+9KffoYTcUhEtO/3bd5GYEmjhKtsTaCqQgJjTkJpRwQO0l5V\nM8f77LD7DHUlvyCGwLOwA7fCnVhbyxRBE69GvAIPac6Vh3egCLf4PbhhXfXIv/q5\n9bYyDQn18QKBgAuGSKMCeAB3eCltKdKTmuqXxRqpmylYz+AvmZMSvOn4xIa4WdUU\noFBOZfEN9uMkG/QsKPME6E76Y6gUmGurxh6l2LNnHI8RvjLYK5GzgZhkmQxpKYuR\nm72aeK9YdkbCHAd7rvO9YddqLHzqMZrXSr6zbPpnwowjc/6X6b+O6TNXAoGARfCz\ng4itXulPbkMfUItZMwhUxBGzhkZjufdIKU+rgZLjcVDYPZLALJR9Fhn1rlzyY2ux\ni5F1NixeNoTGMyLkW1NdQHsrBHoTXVkV1dob4CSPpVnOoXBwT7Urj88n3F0jtj65\nS1WMlEohwhTBgZmcNzs5AayovwHWlah0LJK7AhECgYEAr5rTwEIKdOki+09AD2kn\n0qkVxCSKSDG1DLrg2E910JZ7TgfNTiFfptq8tR0EIb5Wi89fOzHCR8ZWfIU+dmih\n06VMuusfnrxAn6je15h4PKogNfBYZR+voCLP2hxBOW5tkIi5jAduAKN3CtoE7w1u\nGrxvgcyDdWxKvdjWESxdPZ8=\n-----END PRIVATE KEY-----",
+			"expect": {
+				"type": "rsa",
+				"format": "pkcs8",
+				"encrypted": false
+			},
+			"public": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDEbFhuDieL1S1b0xXH6dOIRiovOirZQWtiybsWTu+YjJXbuBIFFmYC80TZAzkwEvGOMfCWt4WDOAFSNopTX2pli6j2IDop7BVb+kiDoidPE50V4chY5CWClN7a8HclmlEPBFrE9cttjsFJtJ1gTL8kCLaOlQgQW/LZ75kzZdKUEGbo+36EDGkam44bDjy5QHRyByc8vVjBuBDYPz6aA9M9n9HZFkVuaCycLUJcwwgV8eyAcXoegLTiZCRXAMswQJ+QtTE7m2Z9qaiYlfV7hKYuvLW6nYUy92mL4hVT0vcG90mOLkm8tiy/kf+lShCS9iu4EIyGlLyh9Tycq/R6kj4/"
+		},
+		"ec_pkcs8": {
+			"made": "openssl pkcs8 -topk8 -nocrypt (P-256), OpenSSL 3.5.9",
+			"text": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg4ReiYWiYUNZFXyPn\nm80U7hjyrJMORcKdtnUpXFTW04qhRANCAAQMQ8HPOhMSdcxI3RbWHE9CxKnppJuW\njPKgXPpJT1pxEvxPNiZAbeKiJ00JTHDLNwY6+DjbqW9W1Qo3dVgy6CUz\n-----END PRIVATE KEY-----",
+			"expect": {
+				"type": "ecdsa",
+				"format": "pkcs8",
+				"encrypted": false
+			},
+			"public": "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAxDwc86ExJ1zEjdFtYcT0LEqemkm5aM8qBc+klPWnES/E82JkBt4qInTQlMcMs3Bjr4ONupb1bVCjd1WDLoJTM="
+		},
+		"ed_pkcs8": {
+			"made": "openssl genpkey -algorithm ed25519, OpenSSL 3.5.9",
+			"text": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIAkOPcXyFbb1CWJGKnObfA4lUw3LC32eZ0sr82SqGIKC\n-----END PRIVATE KEY-----",
+			"expect": {
+				"type": "ed25519",
+				"format": "pkcs8",
+				"encrypted": false
+			},
+			"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOe/XrUrmQKqu8ebzQJXs74Xq9GypsTJrFW3npSy175C"
+		},
+		"ed_pkcs8_enc": {
+			"made": "openssl pkcs8 -topk8 -v2 aes-256-cbc (Ed25519), OpenSSL 3.5.9",
+			"text": "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIGjMF8GCSqGSIb3DQEFDTBSMDEGCSqGSIb3DQEFDDAkBBCbeq3aWmAkdFOnIQmF\n44ukAgIIADAMBggqhkiG9w0CCQUAMB0GCWCGSAFlAwQBKgQQYTfqJFnRUb9VtUdT\nbT66qQRALpAckrW0BdvQVqboy3Srmr+lEWOht3lihjMaVILtVhYx6rfgiU06b6Lu\nUrToj7yzWxuRL+OZl/rivFb2VENH9g==\n-----END ENCRYPTED PRIVATE KEY-----",
+			"expect": {
+				"type": "unknown",
+				"format": "pkcs8",
+				"encrypted": true
+			},
+			"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOe/XrUrmQKqu8ebzQJXs74Xq9GypsTJrFW3npSy175C",
+			"passphrase": true
+		},
+		"rsa_pkcs8_enc": {
+			"made": "openssl pkcs8 -topk8 -v2 aes-256-cbc (RSA), OpenSSL 3.5.9",
+			"text": "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIFNTBfBgkqhkiG9w0BBQ0wUjAxBgkqhkiG9w0BBQwwJAQQFZ7kl3ewTsv99tjR\nzZl4AAICCAAwDAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEELW8SZ0DdeyHJoyg\nSuVpQnsEggTQJT58S9YoUkEJz4MmMbhBZBN4m6dN4c9SiAkMIvIzf84F4K/CsCOr\niyKPcuZKgBUNMLj2usfoSAwu3QXkaPH9+Fycji7hzaZ6EbHPScdI0TioE3V+tbcH\nIgAVkILQkmq8EdVyEta8NcSz681cplMpg0Xk+ueIDwUELBOdY8p+cEys2a/PyKBS\nr/Sm8veh/nMDfBmTX4kdgfncXiiAYwNLxfdnuawBKULEyuaHy1EfpjdZaUoSW+RT\neF94B5180pR8iNfnEJF64S7KDgcsn7pnxqi+/Y04i5UYSymonXBycf3eClBqmNsv\nlRIRrkOSdsh60UE8+kbNnnDn8SNASpjrnT7TyesdNqhNFiwF+Aznq2VJD6UE0MUI\npjG6bR+G/d84IoRRwMldRf71abSJ7evptyJwrIPwRuH6jvgfsS51A7UeQdNoEaBp\nAoD5UnixhRKXXOn0efZtWHfqVrd8bksSTwuEHm/JxIBASMy65hrpfpuCh00Xb2nk\n1tIQzFLOLxBX8fSeB+h3f90x0Bhi7m4WCWWpBCv4XzltgkwUfOPnqwBwk7wEdHJJ\nyJ8OYkO+VFub9bvHrZY8vqLmXwb7xQ+KWW/BAILeG+YnHR1X7wHlGGAIakz7X0t0\nbA48PikKAWqwEO7HC40tkf8q4xVj4gzwj858T+UsMoOqmOCGhAATBFcUKNVNX8Z/\nyXfgZiYLGVdtGZYu5x3SkcLTMdTnoXwXkUlb7e6axd6itXl42FgnAm/tjboqLIL3\ny49Mf7CRj+jB6tvywQ7tNXGqyt8WGB2PGoOVazZs9j9dPj7bPMu/+Jah+wQkKkYP\nwBH14q2KQ5TBLSBbK5dGY+K77VkmKYcYKbI1my7nvTfchU5Q/EGOOLfokYJ0QQAP\nK9MMZnAQWIYGPSHTw//r+xruidJ0mMfDvHy4eFZu4Sd6/n+JpUcYZs2wYPcJoI0a\nBKF9jOtrmu9A4Hmb8+FCB8M5scD+UvcxTHqrG7fRS8icfTHcUXZnCEkQn4A5NFhC\n9UCY/IDkzkcbf++z5aDAILiKq1sQVHXVUQ9E9VvzrUR+sghL0BNM6GP+gekyA01O\n/Cc5X3mXecJtfE+TyC4DLisre2PjDumWNL6ujtTWC2QGUWZ2IvK/6U7zj9Afo6hf\nOiLpMeRDPcIogX9vuhNjs8TGrnKJYVQ2l5UiwyIohFKSclTAMY0UxMZu4AbwZ7YM\nE5tGRxFg+092O6O0RZxzpSjCaV2PWuNYJxpSymJd8rud7C3wWireUnuGjYh4Z5sM\n5sIMkhTVRZQwvPnKOEG8mIFB+uE+Yq2ZgJrF2WWAtnVpapqRfKEqDX7k5IjewL9q\nqB5KGCn8o75Uyc1ZEvn1aeAcOjqA0nA6Zm0569NnmwYWCa+AMb24vzlrvFMEC5rs\nuR9FIWGT6/GHPbMN3unVPFQ2Lsa+D/ITjY6ANUxhOLhLiTiCuvUZgPFyhFTB0VMV\nBvYORcsPR27bXvcE0Gw3wIb25qZDB5m3LHoIfxiewKrvKE08+zfVG77d/NmAKLnP\nATEeSXN3BPaEu76vBa8hIkJegBnvEG8D4fQHjs4xOKMZqnESM9az5lBwf7YZN++o\nYbvAZn6Oq6G73/TzIHJxrWjNgWBGNWB9LR3zMN6jxxSsoThvQ5LHcN0=\n-----END ENCRYPTED PRIVATE KEY-----",
+			"expect": {
+				"type": "unknown",
+				"format": "pkcs8",
+				"encrypted": true
+			},
+			"public": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDEbFhuDieL1S1b0xXH6dOIRiovOirZQWtiybsWTu+YjJXbuBIFFmYC80TZAzkwEvGOMfCWt4WDOAFSNopTX2pli6j2IDop7BVb+kiDoidPE50V4chY5CWClN7a8HclmlEPBFrE9cttjsFJtJ1gTL8kCLaOlQgQW/LZ75kzZdKUEGbo+36EDGkam44bDjy5QHRyByc8vVjBuBDYPz6aA9M9n9HZFkVuaCycLUJcwwgV8eyAcXoegLTiZCRXAMswQJ+QtTE7m2Z9qaiYlfV7hKYuvLW6nYUy92mL4hVT0vcG90mOLkm8tiy/kf+lShCS9iu4EIyGlLyh9Tycq/R6kj4/",
+			"passphrase": true
+		},
+		"dsa_pem": {
+			"made": "openssl gendsa 1024 + pkey -traditional",
+			"text": "-----BEGIN DSA PRIVATE KEY-----\nMIIBywIBAAKBgQC3n7lPIQ2UORsf/7zPOkEaZgMdtWdXMZbGVdf28t8ajI1G0jVD\nCEcw51a2Z/FPyH4/NPxmr7w1xqDlyX0EC4QPJ3TWJjxTL9NP6iA30Vl3oB0rAXqH\nh0ZmLX09SElzmEWcUEYD0eS5hH2P3mKV6C1ARKavoBEWp+JTwat8LnqMKwIdAK4A\n3GIYqXpwHvjwyvCfBKrrI7HyiCF5nHAPipcCgYEAlgwjN4fuPb7T2n8gCeq54zr/\nJM105dT20fG9/Z4tbY3s/no+1mSEpzetYQ4lNp21nclq2+IJ39zqprf5bziUCeMf\nM2XW1F2MXMci2a4rLwRwl9PgrHcS3K7UI/xCb+SLFi48Pvm63wwMv7a+eiYdmYiM\nfAuwAFd/gtXVM6QsCZMCgYAMsdcuuoIYsiI0XO/iz4I7dF4QTuDEh+2lGp+dvfmz\nmLwf89oCmlT5faTMXUuxoUsusB+c5uFRgr4p0ZuuOQ7MYtY+Q0iG61BFcW32I87/\n7BpQc5KBk4KNqAjjajF3WQL5OwjxuH/ICOSMeM3Jvpvgkkdu4QGyJYQDiVItMA+G\nOgIcXgDVRlOkrv5W2TxZKbbJJHo/pzSKTcLUUfj7iA==\n-----END DSA PRIVATE KEY-----",
+			"expect": {
+				"error": "DSA keys can’t sign in. Use an Ed25519, ECDSA or RSA key."
+			}
+		},
+		"dsa_pkcs8": {
+			"made": "openssl pkcs8 -topk8 -nocrypt (DSA)",
+			"text": "-----BEGIN PRIVATE KEY-----\nMIIBWwIBADCCATQGByqGSM44BAEwggEnAoGBALefuU8hDZQ5Gx//vM86QRpmAx21\nZ1cxlsZV1/by3xqMjUbSNUMIRzDnVrZn8U/Ifj80/GavvDXGoOXJfQQLhA8ndNYm\nPFMv00/qIDfRWXegHSsBeoeHRmYtfT1ISXOYRZxQRgPR5LmEfY/eYpXoLUBEpq+g\nERan4lPBq3wueowrAh0ArgDcYhipenAe+PDK8J8EqusjsfKIIXmccA+KlwKBgQCW\nDCM3h+49vtPafyAJ6rnjOv8kzXTl1PbR8b39ni1tjez+ej7WZISnN61hDiU2nbWd\nyWrb4gnf3Oqmt/lvOJQJ4x8zZdbUXYxcxyLZrisvBHCX0+CsdxLcrtQj/EJv5IsW\nLjw++brfDAy/tr56Jh2ZiIx8C7AAV3+C1dUzpCwJkwQeAhxeANVGU6Su/lbZPFkp\ntskkej+nNIpNwtRR+PuI\n-----END PRIVATE KEY-----",
+			"expect": {
+				"error": "DSA keys can’t sign in. Use an Ed25519, ECDSA or RSA key."
+			}
+		},
+		"dsa_openssh": {
+			"made": "synthetic openssh-key-v1 envelope, ssh-dss",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAIwAAAAdzc2gtZH\nNzAAAAFAEBAQEBAQEBAQEBAQEBAQEBAQEBAAAAQAAAAAcAAAAHAAAAB3NzaC1kc3MCAgIC\nAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAdjb21tZW50AQI=\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"error": "DSA keys can’t sign in. Use an Ed25519, ECDSA or RSA key."
+			}
+		},
+		"sk_ecdsa": {
+			"made": "synthetic envelope like the desktop test, sk-ecdsa-sha2-nistp256@openssh.com",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAfwAAACJzay1lY2\nRzYS1zaGEyLW5pc3RwMjU2QG9wZW5zc2guY29tAAAACG5pc3RwMjU2AAAAQQQEBAQEBAQE\nBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA\nQEBAQEAAAABHNzaDoAAABgAAAABwAAAAcAAAAic2stZWNkc2Etc2hhMi1uaXN0cDI1NkBv\ncGVuc3NoLmNvbQICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAAAAB2NvbW1lbn\nQBAgMEBQYH\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"error": "Unable to load SSH private key because it is a security-key (FIDO) key, which signs only with its hardware key. Use an Ed25519, ECDSA or RSA key."
+			}
+		},
+		"sk_ed25519": {
+			"made": "synthetic envelope, sk-ssh-ed25519@openssh.com",
+			"text": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAASgAAABpzay1zc2\ngtZWQyNTUxOUBvcGVuc3NoLmNvbQAAACABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB\nAQEBAQAAAARzc2g6AAAAWAAAAAcAAAAHAAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY2\n9tAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAAAAHY29tbWVudAECAwQFBgc=\n-----END OPENSSH PRIVATE KEY-----",
+			"expect": {
+				"error": "Unable to load SSH private key because it is a security-key (FIDO) key, which signs only with its hardware key. Use an Ed25519, ECDSA or RSA key."
+			}
+		}
+	}
+}

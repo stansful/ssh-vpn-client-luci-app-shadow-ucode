@@ -1,0 +1,92 @@
+#!/bin/sh
+# KnownHostsCommand of the ssh instance (DESIGN §8.1): ssh-hostkey %I %H %t %f %K [probe]
+#
+# The only authority on host keys. It prints a known_hosts line only for a key Shadow trusts:
+# with a pin (RUN/pin.<sid>) exactly that fingerprint, otherwise the key trusted on first use.
+# It always exits 0, because a failure makes ssh stop with "KnownHostsCommand failed".
+# In probe mode (ssh-run looking for the type of a pinned key) it records and trusts what matches
+# the pin but prints nothing, so ssh disconnects before it logs in.
+
+ETC=/etc/shadow-vpn
+RUN=/var/run/shadow-vpn
+KH=$ETC/known_hosts
+
+inv=$1 alias=$2 type=$3 fp=$4 key=$5 mode=$6
+sid=${alias#shadow-}
+
+case "$sid" in
+	s_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+	*) exit 0 ;;
+esac
+
+umask 077
+
+trusted_line() {
+	grep "^$alias " "$KH" 2>/dev/null | head -n 1
+}
+
+# tmp + fsync + rename: the overlay is UBIFS, and without the fsync a power cut shortly after the first
+# connect can leave known_hosts (every server's trust) or trusted.<sid> empty, which means trust on first
+# use again
+store() {
+	mkdir -p "$ETC"
+	if { grep -v "^$alias " "$KH" 2>/dev/null; echo "$alias $type $key"; } > "$KH.$$"; then
+		fsync "$KH.$$" 2>/dev/null
+		mv -f "$KH.$$" "$KH"
+	fi
+	if echo "$type $fp $(date +%s)" > "$ETC/trusted.$sid.$$"; then
+		fsync "$ETC/trusted.$sid.$$" 2>/dev/null
+		mv -f "$ETC/trusted.$sid.$$" "$ETC/trusted.$sid"
+	fi
+	fsync "$ETC" 2>/dev/null
+}
+
+reject() {
+	echo "$1 expected=$2 got=$fp type=$type" > "$RUN/hostkey.$sid.status"
+}
+
+if [ "$inv" = ORDER ]; then
+	# The stored key's type goes first, so the server presents the key Shadow knows.
+	trusted_line
+	exit 0
+fi
+
+[ "$inv" = HOSTNAME ] || exit 0
+
+# Only well-formed values reach the trust files.
+case "$type" in ''|*[!a-z0-9@.-]*) exit 0 ;; esac
+case "$fp" in SHA256:*) ;; *) exit 0 ;; esac
+case "${fp#SHA256:}" in ''|*[!A-Za-z0-9+/]*) exit 0 ;; esac
+case "$key" in ''|*[!A-Za-z0-9+/=]*) exit 0 ;; esac
+
+mkdir -p "$RUN"
+echo "$type $fp $key" > "$RUN/hostkey.$sid.seen"
+
+pin=$(cat "$RUN/pin.$sid" 2>/dev/null)
+old=$(trusted_line | cut -d ' ' -f 3)
+
+if [ "$mode" = probe ]; then
+	[ -n "$pin" ] && [ "$fp" = "$pin" ] && [ "$old" != "$key" ] && store
+	exit 0
+fi
+
+if [ -n "$pin" ]; then
+	if [ "$fp" = "$pin" ]; then
+		[ "$old" = "$key" ] || store
+		echo "$alias $type $key"
+	else
+		reject pin_mismatch "$pin"
+	fi
+elif [ -n "$old" ]; then
+	if [ "$old" = "$key" ]; then
+		echo "$alias $type $key"
+	else
+		expected=$(cut -d ' ' -f 2 "$ETC/trusted.$sid" 2>/dev/null)
+		reject changed "${expected:-unknown}"
+	fi
+else
+	store
+	echo "$alias $type $key"
+fi
+
+exit 0

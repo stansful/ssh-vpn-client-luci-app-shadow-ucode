@@ -1,0 +1,5 @@
+# The two sets of table inet shadow_vpn that ssh-run fills (DESIGN §7.3), with a stale element.
+table inet shadow_vpn {
+	set server4 { type ipv4_addr; flags interval; elements = { 192.0.2.99 } }
+	set server6 { type ipv6_addr; flags interval; elements = { 2001:db8::99 } }
+}

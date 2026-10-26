@@ -1,0 +1,3 @@
+#!/bin/sh
+# Test stub: records the call.
+echo "lists $*" >> /tmp/shadow-vpn-stub.log

@@ -1,0 +1,15 @@
+#!/usr/bin/ucode
+'use strict';
+
+// LocalCommand of the ssh instance (DESIGN §8.2): ssh-up <sid> [detached]
+//
+// ssh runs it after login, once the -D listener is bound, and serves nothing until it exits. So
+// it only records the session and runs gate-set (non-blocking lock); the tunnel check and log
+// upkeep run in a copy of itself that start-stop-daemon detaches.
+
+import { session_up, after_up } from 'shadow-vpn.ssh';
+
+if (ARGV[1] == 'detached')
+	after_up(ARGV[0]);
+else
+	session_up(ARGV[0]);

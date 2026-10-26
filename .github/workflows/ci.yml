@@ -1,0 +1,130 @@
+# Tests on every push and pull request, and on the commit release.yml is about to release (workflow_call:
+# nothing is published from a commit whose tests fail). The lab jobs run on GitHub's arm64 runners, so the
+# Cudy TR3000's aarch64 OpenWrt rootfs runs natively in Docker (tests/lab/README.md).
+#   actionlint   the workflows
+#   unit         ucode unit tests in the router image, the LuCI views, po2lmo, the release build (artifact)
+#   host-docker  install.sh on the factory rootfs (and against the release published on GitHub), the rpcd
+#                plugin, the SSH helpers against a real sshd
+#   lab          the whole lab: install, stage1 (main paths), stage2 (failures), stage3 (boot, upgrade, removal)
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release:
+        description: Called by release.yml; install_test.sh skips the published release, which this one replaces
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# github.workflow is the caller's name under workflow_call: a release's tests never cancel, and are never
+# cancelled by, the tests of a push to the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -euo pipefail {0}
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
+
+  unit:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/lab-host
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Unit tests (ucode, in the router image)
+        run: tests/unit/run.sh
+      - name: LuCI views and the Russian catalog
+        if: ${{ !cancelled() }}
+        run: node tests/unit/luci/check_views.mjs
+      - name: po2lmo
+        if: ${{ !cancelled() }}
+        run: tests/unit/packaging/po2lmo_test.sh
+      - name: Build packages (STRICT)
+        if: ${{ !cancelled() }}
+        env:
+          STRICT: "1"
+        run: |
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) build/mk_apk.sh
+          cp install.sh out/install.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: packages
+          path: out/
+          if-no-files-found: error
+
+  host-docker:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/lab-host
+      - name: install.sh on the factory rootfs
+        env:
+          # this install.sh against the latest release on GitHub (what routers run); not while release.yml
+          # replaces that release
+          PUBLISHED_RELEASE: ${{ inputs.release && 'skip' || 'check' }}
+        run: tests/unit/packaging/install_test.sh
+      - name: rpcd plugin smoke test
+        if: ${{ !cancelled() }}
+        run: tests/unit/luci/rpcd-smoke.sh
+      - name: SSH helpers against a real sshd
+        if: ${{ !cancelled() }}
+        run: tests/unit/ssh/e2e.sh
+
+  lab:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/lab-host
+      - name: Lab up
+        run: tests/lab/up.sh
+      - name: Lab scenario checks (install, stage1, stage2, stage3)
+        run: tests/lab/e2e-shadow.sh install stage1 stage2 stage3 2>&1 | tee "$RUNNER_TEMP/e2e-shadow.log"
+      - name: Collect the lab's logs
+        if: ${{ failure() }}
+        run: |
+          tests/lab/lib/collect-logs.sh "$RUNNER_TEMP/lab-logs"
+          cp "$RUNNER_TEMP/e2e-shadow.log" "$RUNNER_TEMP/lab-logs/" 2>/dev/null || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ failure() }}
+        with:
+          name: lab-logs
+          path: ${{ runner.temp }}/lab-logs/
+          if-no-files-found: warn
+      # docker rm -f (SIGKILL), never a graceful stop: OpenWrt's K90umount would remount the host's cgroup2
+      # read-only (tests/lab/README.md)
+      - name: Lab down
+        if: ${{ always() }}
+        run: tests/lab/down.sh

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Test stand-in for /usr/libexec/shadow-vpn/job: records the call and writes a finished job file.
+R=/tmp/shv-luci/run
+mkdir -p "$R/jobs"
+id="j$(date +%s)$$"
+echo "$*" >> /tmp/shv-luci/jobs.log
+now=$(date +%s)
+printf '{"id":"%s","name":"%s","state":"done","started":%s,"finished":%s,"result":{}}\n' "$id" "$1" "$now" "$now" > "$R/jobs/$id.json"
+echo "$id"

@@ -1,0 +1,5 @@
+config dnsmasq 'guest'
+	list interface 'guest'
+
+config dnsmasq 'main'
+	option confdir '/tmp/custom.d'

@@ -1,0 +1,4 @@
+Authenticated to 127.0.0.1 ([127.0.0.1]:22922) using "publickey".
+channel 2: open failed: connect failed: Connection refused
+Transferred: sent 4612, received 4392 bytes, in 375.4 seconds
+Bytes per second: sent 12.3, received 11.7

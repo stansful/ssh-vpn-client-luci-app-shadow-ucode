@@ -1,0 +1,39 @@
+#!/bin/sh
+# SSH_ASKPASS helper of the ssh instance (DESIGN §8.1): ssh-askpass <prompt>
+#
+# ssh asks for the server password or for the key passphrase; print the stored one, refuse any
+# other prompt. What was asked goes to RUN/ssh.<sid>.askpass, so the log classifier can tell a
+# wrong passphrase or a missing secret from a rejected login.
+
+ETC=/etc/shadow-vpn
+RUN=/var/run/shadow-vpn
+HEX12='[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+
+sid=$SHADOW_ID
+case "$sid" in s_$HEX12) ;; *) exit 1 ;; esac
+
+prompt=$1
+case "$prompt" in
+	"Enter passphrase for key '$ETC/keys/"*"': ")
+		key=${prompt#"Enter passphrase for key '$ETC/keys/"}
+		key=${key%"': "}
+		case "$key" in k_$HEX12) ;; *) exit 1 ;; esac
+		kind=passphrase
+		file=$ETC/secrets/$key.passphrase
+		;;
+	*"@shadow-$sid's password: "|"("*"@shadow-$sid) "*[Pp]assword*)
+		kind=password
+		file=$ETC/secrets/$sid.password
+		;;
+	*)
+		exit 1
+		;;
+esac
+
+if [ -r "$file" ]; then
+	echo "$kind" > "$RUN/ssh.$sid.askpass"
+	exec cat "$file"
+fi
+
+echo "$kind missing" > "$RUN/ssh.$sid.askpass"
+exit 1

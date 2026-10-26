@@ -1,0 +1,10 @@
+#!/bin/sh
+# e2e stub of the runtime's job helper: records the call, then blocks until the test releases it,
+# so the test can show that ssh serves while the tunnel check is still running.
+mkdir -p /tmp/e2e
+echo "$*" >> /tmp/e2e/job.calls
+touch /tmp/e2e/job.started
+while [ ! -e /tmp/e2e/job.release ]; do
+	sleep 1
+done
+touch /tmp/e2e/job.done

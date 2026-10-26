@@ -1,0 +1,44 @@
+name: Lab host
+description: >
+  Prepares an arm64 Ubuntu runner for the Docker lab: the host kernel's nftables modules the router uses,
+  the firmware download cache (tests/lab/dl, keyed by firmware version and sha256) and the lab images and
+  secrets (BUILD_ONLY=1 tests/lab/up.sh).
+
+runs:
+  using: composite
+  steps:
+    # The router's own kmod packages cannot load into the host kernel: nftables loads the host's modules on
+    # demand. Ubuntu keeps some of them in linux-modules-extra; load them now so a missing one is reported here.
+    - name: Kernel modules for the lab router
+      shell: bash --noprofile --norc -euo pipefail {0}
+      run: |
+        echo "kernel $(uname -r), $(docker version --format 'Docker Engine {{.Server.Version}} {{.Server.Arch}}')"
+        mods="nf_tables nft_tproxy nf_tproxy_ipv4 nf_tproxy_ipv6 nft_socket nf_socket_ipv4 nf_socket_ipv6
+          nft_fib_inet nft_fib_ipv4 nft_fib_ipv6 nft_reject_inet nft_redir nft_masq nft_nat nft_chain_nat nft_ct
+          nft_limit nft_log nft_quota nft_numgen"
+        missing=
+        for m in $mods; do sudo modprobe "$m" 2>/dev/null || missing="$missing $m"; done
+        if [ -n "$missing" ]; then
+          echo "not loadable:$missing; installing linux-modules-extra-$(uname -r)"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "linux-modules-extra-$(uname -r)" >/dev/null
+          still=
+          for m in $missing; do sudo modprobe "$m" 2>/dev/null || still="$still $m"; done
+          [ -z "$still" ] || echo "::warning::kernel modules not available:$still (built in, or the lab will fail on them)"
+        fi
+        echo "br_netfilter: $(lsmod | grep -q '^br_netfilter ' && echo loaded || echo 'not loaded')"
+
+    - name: Firmware cache key
+      id: firmware
+      shell: bash --noprofile --norc -euo pipefail {0}
+      run: PRINT_FIRMWARE=1 tests/lab/up.sh | tee -a "$GITHUB_OUTPUT"
+
+    - name: Firmware cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: tests/lab/dl
+        key: lab-dl-${{ steps.firmware.outputs.version }}-${{ steps.firmware.outputs.sha256 }}
+
+    - name: Lab images and secrets
+      shell: bash --noprofile --norc -euo pipefail {0}
+      run: BUILD_ONLY=1 tests/lab/up.sh

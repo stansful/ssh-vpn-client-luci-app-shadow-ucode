@@ -1,0 +1,90 @@
+# Edge cases for build/po2lmo.py. edge.lmo next to it was written by the official
+# po2lmo built from luci-base src/ (openwrt-25.12 @75a306d); the two must stay byte-identical.
+msgid ""
+msgstr ""
+"Project-Id-Version: shadow-vpn\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"plural-forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Language: ru\n"
+
+#: overview.js:1
+msgid "Overview"
+msgstr "Обзор"
+
+msgid "Untranslated"
+msgstr ""
+
+msgid "Same"
+msgstr "Same"
+
+msgctxt "Tunnel state"
+msgid "Connected"
+msgstr "Подключено"
+
+msgid "Connected"
+msgstr "Соединено"
+
+msgid "Quote \" and backslash \\ and newline \n and tab \t"
+msgstr "Кавычка \" и обратная косая \\ и перевод \n и таб \t"
+
+msgid ""
+"Multi "
+"line "
+"id"
+msgstr ""
+"Много"
+"строк"
+
+msgid "%d domain"
+msgid_plural "%d domains"
+msgstr[0] "%d домен"
+msgstr[1] "%d домена"
+msgstr[2] "%d доменов"
+
+msgctxt "rules"
+msgid "%d rule"
+msgid_plural "%d rules"
+msgstr[0] "%d правило"
+msgstr[1] ""
+msgstr[2] "%d правил"
+
+# a comment between the parts
+msgid "Commented"
+# translator note
+msgstr "С комментарием"
+
+msgid "Trailing text"  "ignored"
+msgstr "Хвост" после кавычки
+
+msgid "CRLF line"
+msgstr "Строка CRLF"
+
+msgid "Indented continuation"
+msgstr "Отступ "
+    "продолжение"
+
+msgid "a"
+msgstr "б"
+
+msgid "ab"
+msgstr "вг"
+
+msgid "abc"
+msgstr "дежз"
+
+msgid "\xff byte"
+msgstr "\xff байт"
+
+#~ msgid "Obsolete"
+#~ msgstr "Устарело"
+
+msgctxt "orphan context"
+msgctxt "second context"
+msgid "Context twice"
+msgstr "Контекст дважды"
+
+msgid "Last without newline"
+msgstr "Последняя без перевода строки"
+
+msgid "Raw �"
+msgstr "��"

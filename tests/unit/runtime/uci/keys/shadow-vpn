@@ -1,0 +1,25 @@
+config shadow 'main'
+
+config ssh_key 'k_00000000000a'
+	option name 'encrypted pkcs8'
+	option type 'unknown'
+	option format 'pkcs8'
+	option encrypted '1'
+
+config ssh_key 'k_00000000000b'
+	option name 'plain pkcs8 of no known type'
+	option type 'unknown'
+	option format 'pkcs8'
+	option encrypted '0'
+
+config ssh_key 'k_00000000000c'
+	option name 'openssh of no known type'
+	option type 'unknown'
+	option format 'openssh'
+	option encrypted '1'
+
+config ssh_key 'k_00000000000d'
+	option name 'dsa'
+	option type 'dsa'
+	option format 'pem'
+	option encrypted '0'

@@ -1,0 +1,7 @@
+Package: shadow-vpn
+Depends: xray-core openssh-client dnsmasq-full kmod-nft-tproxy kmod-nft-socket ucode ucode-mod-fs ucode-mod-uci ucode-mod-ubus ucode-mod-socket ucode-mod-digest
+Conffiles:
+License: UNLICENSED
+Maintainer: Shadow <stansful@gmail.com>
+URL: https://github.com/stansful/ssh-vpn-client-luci-app-shadow-ucode
+Description: Shadow: route the LAN through your own server over SSH (ssh -D) or Xray

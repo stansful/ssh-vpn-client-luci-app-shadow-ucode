@@ -1,0 +1,140 @@
+#!/bin/sh
+# procd instance "xray": decides, then execs xray, so no supervisor stays resident (DESIGN.md 6.7).
+# - a fatal config error (found by -test after a crash loop) parks the instance until the next Connect
+# - 3 exits within 30 s of their start run "xray run -test" once, then back off 5 -> 60 s
+# - a detached watcher runs gate-set once xray listens, and after 10 s in fallback mode if it does not
+# xray-run --watch is that watcher.
+
+RUN=/var/run/shadow-vpn
+LIBEXEC=/usr/libexec/shadow-vpn
+XRAY=/usr/bin/xray
+CONF="$RUN/xray.json"
+FALLBACK_SEC=10
+QUICK_SEC=30
+QUICK_MAX=3
+WATCH_MAX=120
+
+uptime_s() {
+	local up
+	read -r up _ < /proc/uptime
+	echo "${up%.*}"
+}
+
+listening() {
+	grep -qE '^ *[0-9]+: (0100007F|7F000001):3039 [0-9A-F]{8}:0000 0A ' /proc/net/tcp
+}
+
+xray_transport() {
+	[ "$(cat "$RUN/transport" 2>/dev/null)" = xray ]
+}
+
+# The Xray transport has no handshake of its own to report: listening is "connected".
+set_state() {
+	xray_transport && "$LIBEXEC/apply" state "$@" >/dev/null 2>&1
+}
+
+# The outage counts from RUN/xray.down (the first respawn), not from this watcher's start: in a crash
+# loop every start replaces the watcher, so a count of its own would never reach FALLBACK_SEC.
+down_for() {
+	local since
+
+	read -r since < "$RUN/xray.down" 2>/dev/null || { echo 0; return; }
+	echo $(($(uptime_s) - ${since:-0}))
+}
+
+watch() {
+	local i=0 opened=0
+
+	while [ $i -lt $WATCH_MAX ]; do
+		if listening; then
+			rm -f "$RUN/xray.down"
+			"$LIBEXEC/gate-set"
+			set_state connected ""
+			exit 0
+		fi
+		if [ $opened = 0 ] && [ "$(down_for)" -ge $FALLBACK_SEC ]; then
+			"$LIBEXEC/gate-set"
+			opened=1
+		fi
+		sleep 1
+		i=$((i + 1))
+	done
+	"$LIBEXEC/gate-set"
+	exit 0
+}
+
+stop_watcher() {
+	local pid
+
+	pid="$(cat "$RUN/xray-watch.pid" 2>/dev/null)"
+	# a stale pid may belong to someone else by now
+	[ -n "$pid" ] && grep -q xray-run "/proc/$pid/cmdline" 2>/dev/null && kill "$pid" 2>/dev/null
+	rm -f "$RUN/xray-watch.pid"
+}
+
+start_watcher() {
+	stop_watcher
+	start-stop-daemon -S -b -m -p "$RUN/xray-watch.pid" -x /bin/sh -- "$0" --watch
+}
+
+# A parked instance needs no watcher: the gate is set here and stays until the next Connect.
+park() {
+	stop_watcher
+	"$LIBEXEC/gate-set"
+	exec sleep 2147483647
+}
+
+[ "$1" = --watch ] && watch
+
+mkdir -p -m 0700 "$RUN"
+[ -s "$CONF" ] || exec sleep 2147483647
+
+# The gate counts the outage from here: procd starts us after xray exited.
+[ -s "$RUN/xray.down" ] || uptime_s > "$RUN/xray.down"
+
+if [ -e "$RUN/xray.fatal" ]; then
+	park
+fi
+
+now="$(uptime_s)"
+quick=0 last=0 tested=0
+[ -s "$RUN/xray.quick" ] && read -r quick last tested < "$RUN/xray.quick"
+if [ "${last:-0}" -gt 0 ] && [ $((now - last)) -lt $QUICK_SEC ]; then
+	quick=$((quick + 1))
+else
+	quick=0
+	tested=0
+fi
+
+if [ "$quick" -ge "$QUICK_MAX" ]; then
+	if [ "$tested" != 1 ]; then
+		tested=1
+		"$XRAY" run -test -c "$CONF" > "$RUN/xray.test" 2>&1
+		if [ $? -eq 23 ]; then
+			touch "$RUN/xray.fatal"
+			"$LIBEXEC/apply" xray-fatal "$RUN/xray.test" >/dev/null 2>&1
+			rm -f "$RUN/xray.test"
+			logger -t shadow-vpn -p daemon.err "xray: configuration error, not restarting until the next Connect"
+			park
+		fi
+		rm -f "$RUN/xray.test"
+	fi
+
+	delay=5
+	n=$QUICK_MAX
+	while [ $n -lt "$quick" ] && [ $delay -lt 60 ]; do
+		delay=$((delay * 2))
+		n=$((n + 1))
+	done
+	[ $delay -gt 60 ] && delay=60
+	logger -t shadow-vpn -p daemon.warn "xray: exited $quick times in a row, next start in ${delay}s"
+	start_watcher
+	sleep "$delay"
+fi
+
+# a previous start in this cycle means xray died: show it as reconnecting
+[ "${last:-0}" -gt 0 ] && set_state reconnecting "Xray runtime exited; restarting."
+echo "$quick $(uptime_s) $tested" > "$RUN/xray.quick"
+
+start_watcher
+exec "$XRAY" run -c "$CONF"

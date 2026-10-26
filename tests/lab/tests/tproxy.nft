@@ -1,0 +1,21 @@
+# Minimal Shadow-like dataplane for the lab (NOT the product ruleset).
+# split mode : dnsmasq-full fills @via_xray4 / @via_ssh4 from DNS answers (nftset=...)
+# full mode  : tests/e2e.sh adds the catch-all rule at the end of chain "prerouting"
+table inet shadow_test {
+	set via_xray4 { type ipv4_addr; flags interval; auto-merge; }
+	set via_ssh4  { type ipv4_addr; flags interval; auto-merge; }
+	set local4 {
+		type ipv4_addr; flags interval
+		elements = { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16,
+		             172.16.0.0/12, 192.168.0.0/16, 224.0.0.0/4, 240.0.0.0/4 }
+	}
+	chain prerouting {
+		type filter hook prerouting priority mangle; policy accept;
+		iifname != "br-lan" return
+		fib daddr type { local, broadcast, multicast } return
+		meta l4proto tcp socket transparent 1 meta mark set 0x105 counter accept
+		ip daddr @local4 return
+		ip daddr @via_ssh4  meta l4proto tcp          meta mark set 0x105 tproxy ip to 127.0.0.1:12346 counter accept
+		ip daddr @via_xray4 meta l4proto { tcp, udp } meta mark set 0x105 tproxy ip to 127.0.0.1:12345 counter accept
+	}
+}

@@ -1,0 +1,21 @@
+
+config interface 'loopback'
+	option device 'lo'
+	option proto 'static'
+	list ipaddr '127.0.0.1/8'
+
+config globals 'globals'
+	option ula_prefix 'auto'
+
+# One Docker network: the LAN side, which also has the default route (Docker NATs it to the feed).
+config device
+	option name 'br-lan'
+	option type 'bridge'
+	list ports 'eth0'
+
+config interface 'lan'
+	option device 'br-lan'
+	option proto 'static'
+	list ipaddr '198.51.100.2/24'
+	option gateway '198.51.100.1'
+	list dns '1.1.1.1'

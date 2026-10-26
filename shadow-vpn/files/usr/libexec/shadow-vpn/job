@@ -1,0 +1,194 @@
+#!/usr/bin/ucode
+'use strict';
+
+// job <name> [args]: runs a slow action detached (start-stop-daemon -b) and prints its id at once.
+// Names: converge [--connect], check [host:port], list-refresh <proxy|direct|due>, wan-up, post-start <gen> [--check].
+// The detached run writes RUN/jobs/<id>.json, which LuCI polls.
+
+import { readfile, open, unlink, access, glob, stat, popen } from 'fs';
+import { connect } from 'ubus';
+import * as C from 'shadow-vpn.const';
+import * as state from 'shadow-vpn.state';
+import * as ssh from 'shadow-vpn.ssh';
+import { endpoint as check_endpoint } from 'shadow-vpn.validate';
+
+const R = C.RUN, SELF = `${C.LIBEXEC}/job`, APPLY = `${C.LIBEXEC}/apply`;
+const SSH_LOG_CAP = 262144;
+const GEN = /^[0-9]{1,24}$/;
+const SSH_SID = /^s_[0-9a-f]{12}$/;
+
+function q(s) {
+	return "'" + replace(`${s}`, "'", "'\\''") + "'";
+}
+
+// The command a job runs, or null when the name or its arguments are not ours.
+function command(name, args) {
+	switch (name) {
+	case 'converge':
+		return [ APPLY, 'converge', ...filter(args, (a) => a == '--connect') ];
+
+	case 'check':
+		// what the settings accept (Unicode names too; tunnel-check converts them)
+		return (args[0] == null || !check_endpoint(args[0]).error) ? [ `${C.LIBEXEC}/tunnel-check`, ...slice(args, 0, 1) ] : null;
+
+	case 'list-refresh':
+		return (index([ 'proxy', 'direct', 'due' ], args[0]) >= 0) ? [ `${C.LIBEXEC}/lists`, 'refresh', args[0] ] : null;
+
+	case 'post-start':
+		return match(args[0] ?? '', GEN) ? [ APPLY, 'post-start', args[0], ...filter(args, (a) => a == '--check') ] : null;
+
+	case 'wan-up':
+		return [];
+	}
+
+	return null;
+}
+
+function run(argv) {
+	let p = popen(`${join(' ', map(argv, q))} </dev/null 2>/dev/null`, 'r');
+
+	if (!p)
+		return { rc: -1, out: '' };
+
+	let out = p.read('all') ?? '';
+
+	return { rc: p.close(), out };
+}
+
+// The detached check also keeps the ssh log bounded: ssh opens it O_APPEND, so truncating is safe.
+function cap_ssh_logs() {
+	for (let f in glob(`${R}/ssh.*.log`) ?? []) {
+		if ((stat(f)?.size ?? 0) > SSH_LOG_CAP) {
+			let fh = open(f, 'w');
+
+			if (fh)
+				fh.close();
+		}
+	}
+}
+
+// Seconds the interface that carries the route to ssh's server address has been up, or null when that
+// is not known. Only an interface of the address's family counts: wan6 shares wan's device, but an IPv4
+// session never runs over it.
+function link_age(sid) {
+	let ip = trim(readfile(`${R}/ssh.${sid}.addr`) ?? '');
+
+	if (!iptoarr(ip))
+		return null;
+
+	let dev = match(run([ 'ip', 'route', 'get', ip ]).out, /(^|[ \t])dev ([^ \t\n]+)/)?.[2];
+	let dump = dev ? connect()?.call('network.interface', 'dump') : null;
+	let v6 = index(ip, ':') >= 0, age = null;
+
+	for (let st in dump?.interface ?? []) {
+		if (!st?.up || type(st.uptime) != 'int' || (st.l3_device ?? st.device) != dev)
+			continue;
+
+		let addrs = v6 ? [ ...(st['ipv6-address'] ?? []), ...(st['ipv6-prefix'] ?? []) ] : (st['ipv4-address'] ?? []);
+
+		if (length(addrs) && (age == null || st.uptime < age))
+			age = st.uptime;
+	}
+
+	return age;
+}
+
+// Reconnect now instead of waiting for ServerAlive, and refresh the server addresses. A session that
+// started after the link it runs over came up is already on the new path: only the backoff is reset.
+function wan_up() {
+	if (!access(`${R}/active`) || access(`${R}/fatal`) || access(`${R}/xray.fatal`))
+		return { rc: 0, skipped: true };
+
+	let sid = trim(readfile(`${R}/ssh.sid`) ?? ''), restarted = false;
+
+	if (match(sid, SSH_SID)) {
+		let stale = ssh.session_stale(sid, link_age(sid));
+
+		// the next attempt starts at once instead of waiting out the backoff
+		ssh.reset_backoff(sid);
+
+		let u = stale ? connect() : null;
+
+		if (u) {
+			u.call('service', 'signal', { name: 'shadow-vpn', instance: 'ssh', signal: 15 });
+			restarted = true;
+		}
+	}
+
+	return { rc: run([ APPLY, 'converge' ]).rc, ssh_restarted: restarted };
+}
+
+function execute(id, name, args) {
+	let argv = command(name, args);
+	let result;
+
+	if (name == 'wan-up') {
+		result = wan_up();
+	}
+	else {
+		let r = run(argv);
+
+		result = { rc: r.rc };
+
+		if (name == 'check') {
+			try {
+				result = { rc: r.rc, ...json(r.out) };
+			}
+			catch (e) { }
+
+			cap_ssh_logs();
+		}
+		else if (name == 'list-refresh') {
+			// the reason of a failed download, which LuCI shows (lists prints one JSON object)
+			try {
+				let out = json(r.out);
+
+				result = { rc: r.rc, ...((type(out?.results) == 'array') ? { results: out.results } : out) };
+			}
+			catch (e) { }
+		}
+		else if (name == 'converge') {
+			let s = state.read();
+
+			result.phase = s.phase;
+			result.message = s.message;
+		}
+	}
+
+	state.job_write(id, { state: (result.rc == 0) ? 'done' : 'failed', result });
+}
+
+function start(name, args) {
+	if (command(name, args) == null) {
+		warn(`job: unknown job or arguments: ${name}\n`);
+		return 2;
+	}
+
+	let c = clock(true), id = sprintf('%d-%09d', c[0], c[1]);
+
+	state.job_write(id, { name, state: 'running', started: time(), finished: null, result: {} });
+
+	// -b detaches into its own session and closes inherited descriptors (procd's and our locks)
+	let rc = system([ 'start-stop-daemon', '-S', '-b', '-x', SELF, '--', '--run', id, name, ...args ]);
+
+	if (rc != 0) {
+		state.job_write(id, { state: 'failed', result: { rc, error: 'could not start the job' } });
+		return 1;
+	}
+
+	print(`${id}\n`);
+
+	return 0;
+}
+
+if (ARGV[0] == '--run') {
+	let id = ARGV[1];
+
+	if (!state.valid_job_id(id) || command(ARGV[2], slice(ARGV, 3)) == null)
+		exit(2);
+
+	execute(id, ARGV[2], slice(ARGV, 3));
+	exit(0);
+}
+
+exit(start(ARGV[0], slice(ARGV, 1)));

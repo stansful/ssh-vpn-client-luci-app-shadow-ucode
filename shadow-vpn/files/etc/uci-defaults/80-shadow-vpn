@@ -1,0 +1,70 @@
+#!/bin/sh
+# Creates /etc/config/shadow-vpn with the defaults of DESIGN.md 5 (fills options a newer version added)
+# and registers the fw4 script include that heals the data plane after every fw4 reload.
+
+[ -e /etc/config/shadow-vpn ] || touch /etc/config/shadow-vpn
+
+uci -q get shadow-vpn.main >/dev/null || uci -q set shadow-vpn.main=shadow
+
+set_default() {
+	uci -q get "shadow-vpn.main.$1" >/dev/null || uci -q set "shadow-vpn.main.$1=$2"
+}
+
+set_default enabled 0
+set_default autostart 1
+set_default transport ssh
+set_default mode proxy-all
+set_default kill_switch 1
+set_default check_endpoint youtube.com:443
+set_default check_after_connect 1
+set_default ssh_udp reject
+set_default tunnel_dns 1
+set_default ipv6 0
+set_default dns_redirect 1
+set_default router_traffic 1
+set_default lists_refresh 24
+set_default log_level warning
+
+for list in proxy direct; do
+	uci -q get "shadow-vpn.$list" >/dev/null && continue
+	uci -q set "shadow-vpn.$list=list"
+	uci -q set "shadow-vpn.$list.enabled=0"
+done
+
+uci -q commit shadow-vpn
+
+if ! uci -q get firewall.shadow_vpn >/dev/null; then
+	uci -q set firewall.shadow_vpn=include
+	uci -q set firewall.shadow_vpn.type=script
+	uci -q set firewall.shadow_vpn.path=/usr/libexec/shadow-vpn/fw4-hook
+	uci -q set firewall.shadow_vpn.fw4_compatible=1
+	uci -q commit firewall
+fi
+
+mkdir -p /etc/shadow-vpn/secrets /etc/shadow-vpn/keys /etc/shadow-vpn/lists
+chmod 0700 /etc/shadow-vpn /etc/shadow-vpn/secrets /etc/shadow-vpn/keys /etc/shadow-vpn/lists
+
+# Earlier builds kept each Xray profile's dedupe identity in UCI as a plain SHA-256 of the link's fields
+# (its password included): replace it with the keyed form (secrets.profile_identity, DESIGN.md 5).
+if uci -q show shadow-vpn | grep -q "\.fingerprint='sha256:"; then
+	ucode -S -e '
+		import { cursor } from "uci";
+		import { profile_identity } from "shadow-vpn.secrets";
+
+		let c = cursor(), n = 0;
+
+		c.foreach("shadow-vpn", "profile", (s) => {
+			let id = match(s.fingerprint ?? "", /^sha256:[0-9a-f]{64}$/) ? profile_identity(s.fingerprint) : null;
+
+			if (id) {
+				c.set("shadow-vpn", s[".name"], "fingerprint", id);
+				n++;
+			}
+		});
+
+		if (n)
+			c.commit("shadow-vpn");
+	' 2>/dev/null
+fi
+
+exit 0

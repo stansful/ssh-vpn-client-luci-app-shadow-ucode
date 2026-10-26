@@ -1,0 +1,19 @@
+#!/usr/bin/ucode
+'use strict';
+
+// ssh-classify <log> [sid]: what an ssh -E log means, as JSON { code, fatal, message }.
+// With a sid (or a log named ssh.<sid>.log) the current run's context in RUN is taken into account.
+
+import { readfile } from 'fs';
+import { classify, context } from 'shadow-vpn.ssh';
+
+const path = ARGV[0];
+const sid = ARGV[1] ?? match(path ?? '', /ssh\.(s_[0-9a-f]{12})\.log$/)?.[1];
+const text = path ? readfile(path) : null;
+
+if (text == null) {
+	warn('usage: ssh-classify <log> [sid]\n');
+	exit(2);
+}
+
+print(sprintf('%J\n', classify(text, sid ? context(sid) : null)));

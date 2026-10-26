@@ -1,0 +1,1448 @@
+#!/usr/bin/ucode
+'use strict';
+
+// apply converge [--from-init] [--boot] [--connect]   DESIGN.md 6.3
+// apply teardown [--from-init]                       DESIGN.md 6.4
+// apply render <dir> [--config <uci confdir>]         render every file into <dir>, touch nothing
+// Internal, used by the other helpers: post-start <gen> [--check], state <phase> [message] [code],
+// xray-fatal <test output file>, lan-check.
+
+import { readfile, open, rename, unlink, mkdir, stat, glob, access, popen, lsdir, rmdir, chmod } from 'fs';
+import { cursor } from 'uci';
+import { connect } from 'ubus';
+import * as C from 'shadow-vpn.const';
+import * as config from 'shadow-vpn.config';
+import * as secrets from 'shadow-vpn.secrets';
+import * as state from 'shadow-vpn.state';
+import * as xray from 'shadow-vpn.xray';
+import * as links from 'shadow-vpn.links';
+import * as lists from 'shadow-vpn.lists';
+import * as routing from 'shadow-vpn.routing';
+import * as ssh from 'shadow-vpn.ssh';
+
+const R = C.RUN, NEXT = `${C.RUN}/next`;
+const TABLE = `inet ${C.NFT_TABLE}`;
+const MARK = sprintf('0x%x/0x%x', C.MARK_TPROXY, C.MARK_TPROXY);
+const CHAIN_PRE_RULE = sprintf('meta mark & 0x%08x == 0x%08x accept', C.MARK_TPROXY, C.MARK_TPROXY);
+
+// Files a render produces besides the per-server ones; all of them live in RUN once applied.
+const RENDERED = [ 'xray.json', 'table.open.nft', 'table.accept.nft', 'dnsmasq.conf', 'dnsmasq.down.conf',
+	'patterns', 'fallback', 'transport', 'dnsmasq', 'wan_dns', 'wan_networks', 'lan_state', 'ssh.sid', 'ssh.files' ];
+const RUNTIME = [ ...RENDERED, 'table.nft', 'table.apply.nft', 'gate', 'applied', 'flush.sets', 'dnsmasq.restart',
+	'dnsmasq.hup', 'xray.down', 'xray.fatal', 'xray.quick', 'ssh.stamp', 'ssh.gen', 'fatal', 'check.json', 'patterns.applied',
+	'servers.up', 'servers.down' ];
+const ATTENTION_CODES = [ 'nothing_to_route', 'ssh_fatal', 'xray_config', 'port_busy', 'dns_rejected', 'nft_rejected' ];
+const DNS_LEAK = 'In full mode some DNS lookups go to %s directly: remove them in Network → DHCP and DNS or turn off DNS through the tunnel in Settings.';
+const DNS_TUNNELLED = 'In full mode DNS lookups sent to %s go through the tunnel, so they fail while it is down. The VPN server name and the time servers go to %s instead.';
+const DNS_NO_BOOTSTRAP = 'In full mode no DNS server outside the tunnel is set: the VPN server name is answered from its last known address, and the router clock cannot be set while the tunnel is down. Add a plain DNS server in Network → DHCP and DNS.';
+const HOSTNAME = /^[A-Za-z0-9._-]+$/, SET_NAME = /^[A-Za-z0-9_]+$/;
+
+let ubus_conn = null;
+
+function q(s) {
+	return "'" + replace(`${s}`, "'", "'\\''") + "'";
+}
+
+function sh(cmd) {
+	return system(`${cmd} </dev/null >/dev/null 2>&1`);
+}
+
+function run(cmd) {
+	let p = popen(`${cmd} </dev/null 2>&1`, 'r');
+
+	if (!p)
+		return { rc: -1, out: '' };
+
+	let out = p.read('all') ?? '';
+
+	return { rc: p.close(), out };
+}
+
+function first_line(text) {
+	return trim(split(trim(text ?? ''), '\n')[0] ?? '');
+}
+
+function ubus_call(object, method, args) {
+	ubus_conn ??= connect();
+
+	return ubus_conn ? ubus_conn.call(object, method, args ?? {}) : null;
+}
+
+// tmp + rename. The tmp file starts with a dot in the same directory: dnsmasq's conf-dir skips dot files,
+// so a dnsmasq that starts while our conf is being written never reads a half of it next to the old one.
+function put(path, data, mode) {
+	let slash = rindex(path, '/');
+	let tmp = `${substr(path, 0, slash + 1)}.${substr(path, slash + 1)}.tmp`;
+
+	unlink(tmp);
+
+	let f = open(tmp, 'wx', mode ?? 0o600);
+
+	if (!f)
+		return false;
+
+	let ok = f.write(data) == length(data);
+
+	f.close();
+
+	// the mode passed to open() is cut by the umask (077 under rpcd's jobs): dnsmasq must read its files
+	if (ok && mode != null)
+		ok = chmod(tmp, mode) == true;
+
+	if (!ok || !rename(tmp, path)) {
+		unlink(tmp);
+		return false;
+	}
+
+	return true;
+}
+
+function read_trim(path) {
+	return trim(readfile(path) ?? '');
+}
+
+function lock(wait) {
+	mkdir('/var/lock', 0o755);
+
+	let f = open(C.LOCK, 'ae', 0o600);
+
+	if (!f)
+		return null;
+
+	if (f.lock(wait ? 'x' : 'xn'))
+		return f;
+
+	f.close();
+
+	return null;
+}
+
+// A hook that found the lock busy left `pending`; whoever holds the lock converges again once it lets go.
+function token() {
+	let c = clock(true);
+
+	return sprintf('%d%09d', c[0], c[1]);
+}
+
+function spawn_job(...args) {
+	return sh(join(' ', [ `${C.LIBEXEC}/job`, ...map(args, q) ]));
+}
+
+// A hook that found the lock busy left `pending`; whoever holds the lock converges again once it lets go.
+function release(lk) {
+	let again = access(`${R}/pending`) == true;
+
+	lk.close();
+
+	if (again)
+		spawn_job('converge');
+}
+
+// procd instances follow RUN/active; the init script reads the rendered files. Never called while
+// holding our lock: the init script takes procd's per-service lock, and stop_service takes ours.
+function declare() {
+	return sh('SHADOW_DECLARE=1 /etc/init.d/shadow-vpn start');
+}
+
+function parse_flags(args) {
+	let opts = { rest: [] };
+
+	for (let i = 0; i < length(args); i++) {
+		let a = args[i];
+
+		if (a == '--config')
+			opts.config = args[++i];
+		else if (substr(a, 0, 2) == '--')
+			opts[replace(substr(a, 2), '-', '_')] = true;
+		else
+			push(opts.rest, a);
+	}
+
+	return opts;
+}
+
+/* ---- system facts ---------------------------------------------------------------------------- */
+
+function tcp_listening(port) {
+	let suffix = sprintf(':%04X', port);
+
+	for (let line in split(readfile('/proc/net/tcp') ?? '', '\n')) {
+		let f = split(trim(line), /[ \t]+/);
+
+		if (length(f) > 3 && f[3] == '0A' && substr(f[1], -5) == suffix)
+			return true;
+	}
+
+	return false;
+}
+
+function our_pids() {
+	let res = ubus_call('service', 'list', { name: 'shadow-vpn' });
+	let pids = {};
+
+	for (let name, inst in res?.['shadow-vpn']?.instances ?? {})
+		if (inst.pid)
+			pids[`${inst.pid}`] = true;
+
+	return pids;
+}
+
+// Every port we bind must be free or held by our own instances (xray -test does not bind).
+function busy_port(ports) {
+	let ours = our_pids();
+
+	for (let line in split(run('netstat -lntup').out, '\n')) {
+		let f = split(trim(line), /[ \t]+/);
+
+		if (length(f) < 5 || !match(f[0], /^(tcp|udp)6?$/))
+			continue;
+
+		let port = +(match(f[3], /:([0-9]+)$/)?.[1] ?? -1);
+
+		if (index(ports, port) < 0)
+			continue;
+
+		let owner = match(f[length(f) - 1], /^([0-9]+)\/(.*)$/);
+
+		if (owner && ours[owner[1]])
+			continue;
+
+		return { port, program: owner ? owner[2] : 'another program' };
+	}
+
+	return null;
+}
+
+// Every address of a server name, through the router's resolver (dnsmasq sends server names to the
+// normal upstream). One lookup per family: a lookup of both fails as a whole when the upstream
+// mishandles AAAA.
+function resolve(host) {
+	let literal = replace(host, /^\[(.*)\]$/, '$1');
+
+	if (iptoarr(literal))
+		return [ literal ];
+
+	if (!match(host, HOSTNAME))
+		return [];
+
+	let socket = require('socket'), addrs = [];
+
+	for (let family in [ socket.AF_INET, socket.AF_INET6 ])
+		for (let ai in socket.addrinfo(host, null, { family, socktype: socket.SOCK_STREAM }) ?? [])
+			if (iptoarr(ai?.addr?.address))
+				push(addrs, ai.addr.address);
+
+	return uniq(addrs);
+}
+
+// The address ssh is connected to (ssh-run resolves it once per connect and puts exactly it into
+// @server4/6); a render must keep it there, or ssh's own packets would be diverted into the tunnel.
+function ssh_addr(sid) {
+	let ip = read_trim(`${R}/ssh.${sid}.addr`);
+
+	return iptoarr(ip) ? [ ip ] : null;
+}
+
+function resolv_servers(path) {
+	let out = [];
+
+	for (let line in split(readfile(path) ?? '', '\n')) {
+		let m = match(line, /^[ \t]*nameserver[ \t]+([0-9A-Fa-f.:]+)[ \t]*$/);
+
+		if (m && iptoarr(m[1]))
+			push(out, m[1]);
+	}
+
+	return uniq(out);
+}
+
+// The upstreams dnsmasq would use besides ours: its server list and, unless noresolv, resolv.conf.auto.
+// The resolv file is read either way: with noresolv its WAN servers can still resolve the names that must
+// never wait for the tunnel (bootstrap below).
+function upstreams(sysc, inst) {
+	let s = sysc.get_all('dhcp', inst) ?? {};
+	let list = (type(s.server) == 'array') ? s.server : (s.server != null ? [ s.server ] : []);
+	let plain = filter(list, (v) => match(v, /^[0-9A-Fa-f.:]+(#[0-9]+)?$/) && v != `127.0.0.1#${C.PORT_DNS}`);
+	let noresolv = config.parse_bool(s.noresolv) === true;
+	let file = s.resolvfile ?? '/tmp/resolv.conf.d/resolv.conf.auto';
+	let wan = resolv_servers(file);
+	let auto = noresolv ? [] : wan;
+
+	return { all: uniq([ ...plain, ...auto ]), auto, plain, wan, noresolv, resolvfile: file, uci: list };
+}
+
+function zone_networks(sysc, name) {
+	let nets = [];
+
+	sysc.foreach('firewall', 'zone', (z) => {
+		if (z.name == name)
+			nets = (type(z.network) == 'array') ? z.network : split(z.network ?? '', /[ \t]+/);
+	});
+
+	return filter(nets, (n) => n != '');
+}
+
+function addr_cidrs(st, kinds) {
+	let out = [];
+
+	for (let k in kinds)
+		for (let a in st?.[k] ?? [])
+			if (type(a?.address) == 'string' && iptoarr(a.address) && type(a?.mask) == 'int')
+				push(out, `${a.address}/${a.mask}`);
+
+	return out;
+}
+
+// The LAN zone's devices and subnets, the router's own networks on every other side but the WAN (their
+// traffic between each other stays local, DESIGN §7.2), and the WAN zone's networks (for the iface hook).
+function lan_info(sysc, dump) {
+	let lan = zone_networks(sysc, 'lan'), wan = zone_networks(sysc, 'wan');
+
+	lan = length(lan) ? lan : [ 'lan' ];
+	wan = length(wan) ? wan : [ 'wan', 'wan6' ];
+
+	let ifs = [], subnets = [], local_nets = [];
+
+	for (let st in dump?.interface ?? []) {
+		let n = st?.interface;
+
+		if (type(n) != 'string' || !match(n, /^[A-Za-z0-9_.-]+$/) || n == 'loopback' || index(wan, n) >= 0)
+			continue;
+
+		let nets = addr_cidrs(st, [ 'ipv4-address', 'ipv6-address', 'ipv6-prefix-assignment' ]);
+
+		push(local_nets, ...nets);
+
+		if (index(lan, n) < 0)
+			continue;
+
+		let dev = st.l3_device ?? st.device;
+
+		if (dev)
+			push(ifs, dev);
+
+		for (let c in nets) {
+			let net = xray.parse_cidr(c);
+
+			if (net)
+				push(subnets, net);
+		}
+	}
+
+	return { ifs: length(ifs) ? uniq(ifs) : [ 'br-lan' ], subnets, local_nets: sort(uniq(local_nets)), wan };
+}
+
+// Names of the router's time servers (sysntpd: system.ntp, and those DHCP gave when use_dhcp is on).
+// They are exempt from tunnel DNS: a router without a battery clock boots with an old time, and TLS
+// and VMess fail until NTP has set it (DESIGN §7.2).
+function ntp_names(sysc, dump) {
+	let s = sysc.get_all('system', 'ntp');
+
+	if (!s || config.parse_bool(s.enabled) === false)
+		return [];
+
+	let names = (type(s.server) == 'array') ? [ ...s.server ] : (type(s.server) == 'string' ? [ s.server ] : []);
+
+	if (config.parse_bool(s.use_dhcp) !== false) {
+		let only = (type(s.dhcp_interface) == 'array') ? s.dhcp_interface : (s.dhcp_interface ? [ s.dhcp_interface ] : null);
+
+		for (let st in dump?.interface ?? [])
+			if (!only || index(only, st?.interface) >= 0)
+				for (let n in st?.data?.ntpserver ?? [])
+					push(names, n);
+	}
+
+	return uniq(filter(names, (n) => type(n) == 'string' && !iptoarr(n)));
+}
+
+function in_subnets(ip, subnets) {
+	let net = xray.parse_cidr(ip);
+
+	if (!net)
+		return false;
+
+	for (let s in subnets)
+		if (length(s.addr) == length(net.addr) && s.prefix <= net.prefix && xray.overlaps(net, s))
+			return true;
+
+	return false;
+}
+
+function fail(code, message) {
+	return { error: message, code };
+}
+
+function xray_rejected(output) {
+	let reason = state.xray_failure(output);
+
+	return reason ? `Xray rejected the configuration: ${reason}` : 'Xray rejected the configuration.';
+}
+
+/* ---- render ---------------------------------------------------------------------------------- */
+
+// Everything the renderers need that comes from the system rather than from UCI.
+function gather(model, sysc, armed) {
+	let m = model.main, sel = config.selected(model);
+	let ctx = { transport: m.transport, sel };
+
+	if (!sel)
+		return fail('no_selection', (m.transport == 'ssh') ? 'Select an SSH server first.' : 'Select an Xray profile first.');
+
+	if (m.transport == 'ssh') {
+		if (sel.auth == 'password' && !access(secrets.path(sel.sid, 'password')))
+			return fail('ssh_fatal', 'SSH password is unavailable.');
+
+		if (sel.auth == 'key' && !access(secrets.path(sel.key, 'key')))
+			return fail('ssh_fatal', 'SSH private key is unavailable.');
+
+		// what ssh itself would refuse (a user name saved before the form checked it, validate.ssh_username)
+		if (ssh.params(sel) == null)
+			return fail('ssh_fatal', 'SSH server settings are invalid.');
+
+		ctx.server_hosts = [ sel.host ];
+		ctx.target = { kind: 'ssh', name: sel.name, addr: `${sel.host}:${sel.port}` };
+		ctx.flow = '';
+	}
+	else {
+		if (!sel.supported)
+			return fail('xray_config', 'Unsupported proxy URI protocol.');
+
+		let link = trim(secrets.read(sel.sid, 'link') ?? '');
+
+		if (link == '')
+			return fail('xray_config', 'The link of the selected Xray profile is missing.');
+
+		let parsed = links.parse(link), ob = parsed?.ok ? links.outbound(link) : null;
+
+		if (!parsed?.ok)
+			return fail('xray_config', parsed?.error ?? 'The link of the selected Xray profile is invalid.');
+
+		if (!ob?.ok)
+			return fail('xray_config', ob?.error ?? 'The link of the selected Xray profile is invalid.');
+
+		ctx.outbound = ob.outbound;
+		ctx.server_hosts = parsed.profile?.hosts ?? [ sel.host ];
+		ctx.flow = parsed.profile?.flow ?? sel.flow;
+		ctx.target = { kind: 'xray', name: sel.name, addr: `${sel.host}:${sel.port}`, protocol: sel.protocol };
+	}
+
+	// Plain Vision drops QUIC inside xray; reject it in nft so browsers fall back to TCP at once.
+	ctx.vision = match(ctx.flow ?? '', /^xtls-rprx-vision/) != null;
+	ctx.vision_udp443 = ctx.flow == 'xtls-rprx-vision';
+
+	let dump = ubus_call('network.interface', 'dump');
+
+	ctx.lists = {
+		proxy: model.lists.proxy.enabled ? (lists.load('proxy') ?? []) : [],
+		direct: model.lists.direct.enabled ? (lists.load('direct') ?? []) : []
+	};
+	ctx.ntp_names = ntp_names(sysc, dump);
+	ctx.patterns = routing.patterns(model, ctx.lists, [ ...ctx.server_hosts, ...ctx.ntp_names ]);
+
+	ctx.dnsmasq = config.dnsmasq_instance(sysc);
+
+	if (!ctx.dnsmasq)
+		return fail('dns_rejected', 'No enabled dnsmasq instance serves the LAN.');
+
+	let up = upstreams(sysc, ctx.dnsmasq.name);
+	let inst = sysc.get_all('dhcp', ctx.dnsmasq.name) ?? {};
+	let lan = lan_info(sysc, dump);
+	let lan_cidrs = map(lan.subnets, (s) => `${arrtoip(s.addr)}/${s.prefix}`);
+
+	// the instance's own max-ttl: a second one makes dnsmasq refuse to start
+	ctx.uci = { max_ttl: inst.max_ttl };
+	ctx.wan_dns = up.all;
+	ctx.wan_auto = up.wan;
+	ctx.uci_servers = up.uci;
+	ctx.resolvfile = up.resolvfile;
+	// what resolves the names that must never wait for the tunnel: plain DNS outside it, the instance's
+	// own servers first, the WAN's when those cannot (with noresolv too)
+	ctx.bootstrap_dns = routing.bootstrap_upstreams(model, up.noresolv ? up.plain : up.all, lan_cidrs);
+
+	if (!length(ctx.bootstrap_dns) && up.noresolv)
+		ctx.bootstrap_dns = routing.bootstrap_upstreams(model, up.wan, lan_cidrs);
+
+	ctx.tunnelled_dns = routing.tunnelled_upstreams(model, up.all);
+	ctx.lan_ifs = lan.ifs;
+	ctx.local_nets = lan.local_nets;
+	ctx.wan_networks = lan.wan;
+	ctx.dns_upstream4 = [];
+	ctx.dns_upstream6 = [];
+
+	if (m.dns_redirect) {
+		for (let s in up.all) {
+			let ip = split(s, '#')[0];
+
+			if (in_subnets(ip, lan.subnets))
+				push(length(iptoarr(ip)) == 4 ? ctx.dns_upstream4 : ctx.dns_upstream6, ip);
+		}
+	}
+
+	ctx.server4 = [];
+	ctx.server6 = [];
+	// the last known addresses of each server name: the dnsmasq conf answers them itself when no DNS
+	// server outside the tunnel is left (routing.render_dnsmasq)
+	ctx.host_addrs = {};
+
+	let addrs = [];
+	let known = (h, list) => {
+		let name = replace(lc(h ?? ''), /\.$/, '');
+
+		if (!iptoarr(replace(name, /^\[(.*)\]$/, '$1')))
+			ctx.host_addrs[name] = uniq([ ...(ctx.host_addrs[name] ?? []), ...list ]);
+
+		push(addrs, ...list);
+	};
+
+	if (m.transport == 'ssh')
+		known(sel.host, ssh_addr(sel.sid) ?? resolve(sel.host));
+	else
+		for (let h in ctx.server_hosts)
+			known(h, resolve(h));
+
+	for (let ip in addrs)
+		push(length(iptoarr(ip)) == 4 ? ctx.server4 : ctx.server6, ip);
+
+	ctx.server4 = uniq(ctx.server4);
+	ctx.server6 = uniq(ctx.server6);
+
+	let gate = armed ? read_trim(`${R}/gate`) : '';
+
+	ctx.gate = (gate == 'accept') ? 'accept' : '';
+
+	return ctx;
+}
+
+function ssh_files(model, sel) {
+	let files = [];
+
+	if (sel.auth == 'password')
+		push(files, secrets.path(sel.sid, 'password'));
+
+	if (sel.auth == 'key')
+		push(files, secrets.path(sel.key, 'key'), secrets.path(sel.key, 'passphrase'));
+
+	return filter(files, (f) => f != null);
+}
+
+// What the render took from the LAN side; `lan-check` compares it after an ifup.
+function lan_state(ctx) {
+	return sprintf('%J\n', { ifs: sort([ ...ctx.lan_ifs ]), nets: ctx.local_nets });
+}
+
+function render_all(model, ctx, dir) {
+	let m = model.main, out = {};
+	let x = xray.render(model, { outbound: ctx.outbound, vision: ctx.vision });
+
+	if (!x.ok)
+		return fail('xray_config', x.error);
+
+	out['xray.json'] = sprintf('%.2J\n', x.config);
+
+	let nctx = {
+		gate: '', server4: ctx.server4, server6: ctx.server6, lan_ifs: ctx.lan_ifs, local_nets: ctx.local_nets,
+		dns_upstream4: ctx.dns_upstream4, dns_upstream6: ctx.dns_upstream6,
+		vision_udp443: ctx.vision_udp443, patterns: ctx.patterns
+	};
+
+	out['table.open.nft'] = routing.render_nft(model, nctx);
+	out['table.accept.nft'] = routing.render_nft(model, { ...nctx, gate: 'accept' });
+	out['table.nft'] = out[(ctx.gate == 'accept') ? 'table.accept.nft' : 'table.open.nft'];
+
+	let dctx = {
+		wan_dns: ctx.wan_dns, bootstrap_dns: ctx.bootstrap_dns, host_addrs: ctx.host_addrs,
+		tunnel_dns_up: true, patterns: ctx.patterns, uci: ctx.uci
+	};
+
+	// the conf for the tunnel, and the one for fallback mode while xray is down (gate open): the normal
+	// upstream for tunnelled names too (DESIGN 6.7); the gate picks one
+	out['dnsmasq.conf'] = routing.render_dnsmasq(model, dctx).conf;
+	out['dnsmasq.down.conf'] = routing.render_dnsmasq(model, { ...dctx, tunnel_dns_up: false }).conf;
+	out['patterns'] = sprintf('%J\n', ctx.patterns);
+	out['fallback'] = m.kill_switch ? 'block\n' : 'direct\n';
+	out['transport'] = `${m.transport}\n`;
+	out['dnsmasq'] = `${ctx.dnsmasq.name} ${ctx.dnsmasq.confdir}\n`;
+	// for the iface hook: it re-renders when the resolvfile lists other servers than at this render, and
+	// when a network outside the WAN zone comes up or changes (LAN devices and prefixes, lan_state)
+	out['wan_dns'] = `# ${ctx.resolvfile}\n` + join('', map(sort([ ...ctx.wan_auto ]), (s) => `${s}\n`));
+	out['wan_networks'] = join('', map(sort([ ...ctx.wan_networks ]), (n) => `${n}\n`));
+	out['lan_state'] = lan_state(ctx);
+
+	if (m.transport == 'ssh') {
+		let sel = ctx.sel;
+
+		out['ssh.sid'] = `${sel.sid}\n`;
+		out['ssh.files'] = join('', map(ssh_files(model, sel), (f) => `${f}\n`));
+		out[`ssh.${sel.sid}.params`] = ssh.params(sel);
+
+		if (sel.fingerprint != '')
+			out[`pin.${sel.sid}`] = `${sel.fingerprint}\n`;
+	}
+
+	for (let name, data in out) {
+		if (type(data) != 'string')
+			return fail('render', `Could not render ${name}.`);
+
+		if (!put(`${dir}/${name}`, data, 0o600))
+			return fail('render', `Could not write ${dir}/${name}.`);
+	}
+
+	return { files: sort(keys(out)) };
+}
+
+/* ---- checks ---------------------------------------------------------------------------------- */
+
+// Set definitions without their elements; a change means the table has to be recreated.
+function set_defs(text) {
+	let defs = [], n = length(text ?? ''), i = 0;
+
+	while (i < n) {
+		let j = index(substr(text, i), 'set ');
+
+		if (j < 0)
+			break;
+
+		j += i;
+
+		let prev = (j > 0) ? substr(text, j - 1, 1) : ' ';
+		let m = match(prev, /[A-Za-z0-9_]/) ? null : match(substr(text, j, 160), /^set[ \t]+([A-Za-z0-9_]+)[ \t]*\{/);
+
+		if (!m) {
+			i = j + 4;
+			continue;
+		}
+
+		let k = j + length(m[0]), depth = 1;
+
+		while (depth > 0 && k < n) {
+			let rest = substr(text, k);
+			let o = index(rest, '{'), c = index(rest, '}');
+
+			if (c < 0) {
+				k = n;
+				break;
+			}
+
+			if (o >= 0 && o < c) {
+				depth++;
+				k += o + 1;
+			}
+			else {
+				depth--;
+				k += c + 1;
+			}
+		}
+
+		let body = substr(text, j + length(m[0]), k - j - length(m[0]) - 1);
+
+		body = replace(body, /elements[ \t\r\n]*=[ \t\r\n]*\{[^}]*\}[ \t\r\n]*;?/g, '');
+		push(defs, `${m[1]}:${trim(replace(body, /[ \t\r\n]+/g, ' '))}`);
+		i = k;
+	}
+
+	return sort(defs);
+}
+
+// One small chain instead of the whole table: listing that would print every dnsmasq-filled set.
+function nft_table_exists() {
+	return sh(`nft list chain ${TABLE} gate`) == 0;
+}
+
+function run_checks(model, ctx, dir, armed) {
+	let res = {};
+
+	res.xray_changed = !armed || readfile(`${dir}/xray.json`) != readfile(`${R}/xray.json`);
+
+	if (res.xray_changed) {
+		let t = run(`${C.XRAY_BIN} run -test -c ${q(dir + '/xray.json')}`);
+
+		if (t.rc == 127)
+			return fail('xray_config', `Xray runtime was not found at ${C.XRAY_BIN}.`);
+
+		if (t.rc != 0)
+			return fail('xray_config', xray_rejected(t.out));
+	}
+
+	let table = readfile(`${dir}/table.nft`), old_table = readfile(`${R}/table.nft`);
+	let defs_changed = (type(routing.nft_needs_recreate) == 'function')
+		? routing.nft_needs_recreate(old_table, table)
+		: join('\n', set_defs(old_table)) != join('\n', set_defs(table));
+
+	res.recreate = !armed || defs_changed || !nft_table_exists();
+
+	// `table ... {}` first so the delete never fails on a fresh system
+	let tx = res.recreate ? `table ${TABLE} {}\ndelete table ${TABLE}\n${table}` : table;
+
+	if (!put(`${dir}/table.apply.nft`, tx, 0o600))
+		return fail('render', 'Could not write the nft transaction.');
+
+	let n = run(`nft -c -f ${q(dir + '/table.apply.nft')}`);
+
+	if (n.rc != 0)
+		return fail('nft_rejected', `The firewall rejected Shadow's rules: ${first_line(n.out)}`);
+
+	// both variants: the gate may switch to the other one later without a converge of its own
+	for (let f in [ 'dnsmasq.conf', 'dnsmasq.down.conf' ]) {
+		let d = run(`dnsmasq --test -C ${q(dir + '/' + f)}`);
+
+		if (d.rc != 0)
+			return fail('dns_rejected', `DNS configuration rejected: ${first_line(d.out)}`);
+	}
+
+	let ports = [ C.PORT_TPROXY, C.PORT_DNS, C.PORT_CHECK, C.PORT_METRICS ];
+
+	if (model.main.transport == 'ssh')
+		push(ports, C.PORT_SSH);
+
+	let busy = busy_port(ports);
+
+	if (busy)
+		return fail('port_busy', `Port ${busy.port} is already in use by ${busy.program}.`);
+
+	return res;
+}
+
+/* ---- apply and teardown ---------------------------------------------------------------------- */
+
+function ip_rules_del() {
+	for (let fam in [ '-4', '-6' ]) {
+		for (let i = 0; i < 16 && sh(`ip ${fam} rule del fwmark ${MARK} table ${C.RT_TABLE} priority ${C.RT_PRIO}`) == 0; i++)
+			;
+
+		sh(`ip ${fam} route flush table ${C.RT_TABLE}`);
+	}
+}
+
+function ip_rules_add(model) {
+	let errors = 0;
+
+	for (let fam in [ '-4', '-6' ]) {
+		for (let i = 0; i < 16 && sh(`ip ${fam} rule del fwmark ${MARK} table ${C.RT_TABLE} priority ${C.RT_PRIO}`) == 0; i++)
+			;
+
+		let dst = (fam == '-4') ? '0.0.0.0/0' : '::/0';
+		let rc = sh(`ip ${fam} rule add fwmark ${MARK} table ${C.RT_TABLE} priority ${C.RT_PRIO}`) +
+			sh(`ip ${fam} route replace local ${dst} dev lo table ${C.RT_TABLE}`);
+
+		// a kernel without IPv6 only matters when IPv6 is diverted
+		if (rc != 0 && (fam == '-4' || model.main.ipv6))
+			errors++;
+	}
+
+	return errors == 0;
+}
+
+// The chain-pre file accepts tproxied packets in fw4's input chain. It is only active after an fw4 reload,
+// and a reload also moves flows that were offloaded before we started back to the slow path.
+function fw4_check(first_arm) {
+	if (sh('nft list table inet fw4') != 0)
+		return;
+
+	let has_rule = index(run('nft list chain inet fw4 input').out, CHAIN_PRE_RULE) >= 0;
+	let offload = false;
+
+	cursor().foreach('firewall', 'defaults', (s) => {
+		if (config.parse_bool(s.flow_offloading) === true)
+			offload = true;
+	});
+
+	// SHADOW_APPLYING: our fw4-hook would only redo what this converge just did
+	if (!has_rule || (first_arm && offload))
+		sh('SHADOW_APPLYING=1 fw4 -q reload');
+}
+
+function dnsmasq_info() {
+	let f = split(read_trim(`${R}/dnsmasq`), ' ');
+
+	return (length(f) == 2 && match(f[0], /^[A-Za-z0-9_]+$/) && substr(f[1], 0, 1) == '/') ? { name: f[0], confdir: f[1] } : null;
+}
+
+// Our conf in the instance's confdir when RUN/dnsmasq does not say where it is: RUN is on tmpfs, but a
+// confdir the user set (/etc/dnsmasq.d) is on flash, so after a reboot, or an Off cut short, a conf of ours
+// can still be there and in effect (full mode: no-resolv and the tunnel as the default upstream).
+function dnsmasq_leftover() {
+	let inst = config.dnsmasq_instance(cursor());
+
+	if (!inst)
+		return null;
+
+	let head = substr(readfile(`${inst.confdir}/${C.DNSMASQ_CONF}`, length(routing.HEADER)) ?? '', 0, length(routing.HEADER));
+
+	return (head == routing.HEADER || access(`${inst.confdir}/${C.DNSMASQ_SERVERS_OLD}`)) ? inst : null;
+}
+
+function dnsmasq_state(inst) {
+	let res = ubus_call('service', 'list', { name: 'dnsmasq' });
+
+	return res?.dnsmasq?.instances?.[inst];
+}
+
+// One bad line makes dnsmasq refuse to start, which takes DNS and DHCP down for the LAN: it has to
+// still run (same pid) one and two seconds after the restart.
+function dnsmasq_alive(inst) {
+	let pid = null;
+
+	for (let i = 0; i < 2; i++) {
+		sleep(1000);
+
+		let st = dnsmasq_state(inst);
+
+		if (!st?.running || (pid != null && st.pid != pid))
+			return false;
+
+		pid = st.pid;
+	}
+
+	return true;
+}
+
+function dnsmasq_restart(inst) {
+	ubus_call('service', 'delete', { name: 'dnsmasq', instance: inst });
+
+	if (sh('/etc/init.d/dnsmasq start') != 0)
+		sh('/etc/init.d/dnsmasq restart');
+
+	return dnsmasq_alive(inst);
+}
+
+function dnsmasq_hup(inst) {
+	ubus_call('service', 'signal', { name: 'dnsmasq', instance: inst, signal: 1 });
+}
+
+// with the servers-file of builds that still had one (it is not read once our conf no longer names it)
+function dns_files(info) {
+	return info ? [ `${info.confdir}/${C.DNSMASQ_CONF}`, `${info.confdir}/${C.DNSMASQ_SERVERS_OLD}` ] : [];
+}
+
+// Removes our dnsmasq files; restarts dnsmasq when the conf was in effect (conf-dir is read only at start).
+function dns_uninstall(info) {
+	let had_conf = info && access(`${info.confdir}/${C.DNSMASQ_CONF}`);
+
+	for (let f in dns_files(info))
+		unlink(f);
+
+	if (had_conf && !dnsmasq_restart(info.name))
+		state.log('error', `dnsmasq instance ${info.name} is not running after removing Shadow's DNS file`);
+}
+
+// The conf for the gate's verdict: the normal upstream for tunnelled names while the gate is open.
+function dns_variant(gate) {
+	return (gate == 'accept') ? 'dnsmasq.down.conf' : 'dnsmasq.conf';
+}
+
+function dns_install(ctx, recreate) {
+	let info = ctx.dnsmasq, old = dnsmasq_info();
+
+	if (old && (old.name != info.name || old.confdir != info.confdir))
+		dns_uninstall(old);
+
+	if (!access(info.confdir)) {
+		mkdir(info.confdir, 0o755);
+		chmod(info.confdir, 0o755);
+	}
+
+	let conf_path = `${info.confdir}/${C.DNSMASQ_CONF}`;
+	let conf = readfile(`${R}/${dns_variant(ctx.gate)}`) ?? '';
+	// a file dnsmasq cannot read after dropping root counts as changed (it was written under a umask)
+	let readable = (p) => ((stat(p)?.perm?.other_read ?? true) == true);
+	let conf_changed = readfile(conf_path) != conf || !readable(conf_path);
+
+	// world-readable, as dnsmasq reads it after dropping root; nothing secret in it
+	if (conf_changed && !put(conf_path, conf, 0o644))
+		return false;
+
+	// what builds with a servers-file left behind
+	unlink(`${info.confdir}/${C.DNSMASQ_SERVERS_OLD}`);
+	unlink(`${R}/servers.up`);
+	unlink(`${R}/servers.down`);
+
+	if (conf_changed)
+		put(`${R}/dnsmasq.restart`, '', 0o600);
+	else if (recreate)
+		put(`${R}/dnsmasq.hup`, '', 0o600);
+
+	return true;
+}
+
+function stop_watchers() {
+	let pid = +read_trim(`${R}/xray-watch.pid`);
+
+	// a stale pid may belong to someone else by now
+	if (pid > 1 && index(readfile(`/proc/${pid}/cmdline`) ?? '', 'xray-run') >= 0)
+		sh(`kill ${pid}`);
+
+	unlink(`${R}/xray-watch.pid`);
+}
+
+function clear_runtime(keep) {
+	for (let f in RUNTIME)
+		if (index(keep ?? [], f) < 0)
+			unlink(`${R}/${f}`);
+
+	for (let pattern in [ `${R}/ssh.*.params`, `${R}/pin.*` ])
+		for (let f in glob(pattern) ?? [])
+			unlink(f);
+}
+
+function armed_leftovers() {
+	return access(`${R}/active`) || nft_table_exists() || dnsmasq_info() != null || dnsmasq_leftover() != null ||
+		index(run('ip -4 rule show').out, `lookup ${C.RT_TABLE}`) >= 0;
+}
+
+// What a teardown keeps while Shadow stays on (nothing to route, a failed converge): the fatal flags and
+// the server stamp, so a rejected login is not tried again without a Connect or a changed server (§8.2).
+// ssh.gen goes: a later start is a new connect series, still parked by the kept flag.
+const KEEP_ON = [ 'fatal', 'xray.fatal', 'ssh.stamp' ];
+
+// DESIGN.md 6.4. `active` goes first, so a heal that runs meanwhile never brings the table back.
+function teardown(keep) {
+	unlink(`${R}/active`);
+	sh(`nft delete table ${TABLE}`);
+	ip_rules_del();
+	dns_uninstall(dnsmasq_info() ?? dnsmasq_leftover());
+	stop_watchers();
+	clear_runtime(keep ? KEEP_ON : []);
+
+	return state.write({ phase: 'disconnected', message: '', code: null, attempt: 0 });
+}
+
+// The new files first, then what belongs to no server any more: whenever the params of a server are gone,
+// RUN/ssh.sid already names another one (or none), so an ssh-run of the old server that starts meanwhile
+// (procd may restart it from a declaration that raced this converge) waits for its replacement
+// (ssh.launch) instead of calling the missing settings fatal.
+function move_into_place(dir, files) {
+	for (let f in [ ...files, 'table.apply.nft' ])
+		if (!rename(`${dir}/${f}`, `${R}/${f}`))
+			return false;
+
+	for (let f in [ 'ssh.sid', 'ssh.files' ])
+		if (index(files, f) < 0)
+			unlink(`${R}/${f}`);
+
+	for (let pattern in [ `${R}/ssh.*.params`, `${R}/pin.*` ])
+		for (let f in glob(pattern) ?? [])
+			if (index(files, substr(f, length(R) + 1)) < 0)
+				unlink(f);
+
+	return true;
+}
+
+// A changed ssh params or secret file restarts the ssh instance; it should not find the old fatal flag.
+function ssh_stamp() {
+	if (!access(`${R}/ssh.sid`))
+		return '';
+
+	let sid = read_trim(`${R}/ssh.sid`);
+	let parts = [ readfile(`${R}/ssh.${sid}.params`) ?? '' ];
+
+	for (let f in split(readfile(`${R}/ssh.files`) ?? '', '\n')) {
+		if (f == '')
+			continue;
+
+		let st = stat(f);
+
+		push(parts, `${f} ${st?.mtime ?? 0} ${st?.size ?? 0}`);
+	}
+
+	return join('\n', parts);
+}
+
+function clear_fatal() {
+	for (let f in [ 'fatal', 'xray.fatal', 'xray.quick' ])
+		unlink(`${R}/${f}`);
+
+	// a new generation in the instance env makes procd restart both instances
+	put(`${R}/gen`, `${token()}\n`, 0o600);
+}
+
+function apply_system(model, ctx, dir, chk, armed, files) {
+	if (!move_into_place(dir, files))
+		return fail('apply', 'Could not move the rendered files into place.');
+
+	let n = run(`nft -f ${q(R + '/table.apply.nft')}`);
+
+	if (n.rc != 0)
+		return fail('nft_rejected', `The firewall rejected Shadow's rules: ${first_line(n.out)}`);
+
+	put(`${R}/gate`, (ctx.gate == 'accept') ? 'accept\n' : '\n', 0o600);
+
+	if (!ip_rules_add(model))
+		return fail('apply', 'Could not add the policy routing rule for table 106.');
+
+	fw4_check(!armed);
+
+	if (!dns_install(ctx, chk.recreate))
+		return fail('dns_rejected', `Could not write Shadow's DNS file into ${ctx.dnsmasq.confdir}.`);
+
+	let old_patterns = state.read_json(`${R}/patterns.applied`);
+	let flush = old_patterns ? (routing.changed_sets(old_patterns, ctx.patterns) ?? []) : [];
+	let left = state.read_json(`${R}/flush.sets`);
+
+	// added to what an earlier converge left for a post-start that has not run yet
+	flush = uniq([ ...((type(left) == 'array') ? left : []), ...flush ]);
+	put(`${R}/flush.sets`, sprintf('%J\n', filter(flush, (s) => match(s, SET_NAME))), 0o600);
+	put(`${R}/patterns.applied`, sprintf('%J\n', ctx.patterns), 0o600);
+
+	if (chk.xray_changed) {
+		unlink(`${R}/xray.fatal`);
+		unlink(`${R}/xray.quick`);
+	}
+
+	let stamp = ssh_stamp();
+	let ssh_changed = stamp != (readfile(`${R}/ssh.stamp`) ?? '');
+
+	// A changed server (edited, switched, pinned) is a new Connect for the reconnect rules too: ssh-run
+	// sees a new generation, so a rejected new password is fatal at once instead of after two tries.
+	if (ssh_changed) {
+		unlink(`${R}/fatal`);
+		put(`${R}/ssh.stamp`, stamp, 0o600);
+		put(`${R}/ssh.gen`, `${token()}\n`, 0o600);
+	}
+
+	let new_gen = !access(`${R}/gen`);
+
+	if (new_gen)
+		put(`${R}/gen`, `${token()}\n`, 0o600);
+
+	put(`${R}/active`, '', 0o600);
+
+	// procd restarts the ssh instance only when its command, env (gen, ssh.gen) or files changed
+	return { ok: true, ssh_restarts: ssh_changed || new_gen };
+}
+
+/* ---- converge -------------------------------------------------------------------------------- */
+
+// The fatal flag that parks an instance until the next Connect (ssh-run, xray-run), with what it said.
+function parked_fatal(transport) {
+	if (transport == 'ssh' && access(`${R}/fatal`)) {
+		let f = state.read_json(`${R}/fatal`);
+
+		return { code: f?.code ?? 'ssh_fatal', message: f?.message ?? 'SSH stopped after an error.' };
+	}
+
+	if (access(`${R}/xray.fatal`)) {
+		let a = filter(state.attention_list() ?? [], (x) => x.code == 'xray_config')[0];
+
+		return { code: 'xray_config', message: a?.message ?? 'Xray rejected the configuration.' };
+	}
+
+	return null;
+}
+
+// Raises code with msg, or clears it when msg is null; a repeat would refresh `since` on every converge.
+function attention_set(code, msg, extra) {
+	if (msg == null) {
+		state.attention_clear(code);
+		return;
+	}
+
+	for (let a in state.attention_list())
+		if (a.code == code && a.message == msg)
+			return;
+
+	state.attention_add(code, msg, extra);
+}
+
+// Full mode: the instance's own UCI upstreams that take some lookups past the tunnel (with tunnel DNS),
+// and resolvers whose lookups go through the tunnel, which the names it needs must never wait for.
+function report_dns(model, ctx) {
+	let servers = routing.dns_leak(model, ctx?.uci_servers);
+
+	attention_set('dns_upstream_leak', length(servers) ? sprintf(DNS_LEAK, join(', ', servers)) : null, { servers });
+
+	let full = model.main.mode != 'selected-rules';
+	let tunnelled = ctx?.tunnelled_dns ?? [], boot = ctx?.bootstrap_dns ?? [];
+	let msg = null;
+
+	if (full && !length(boot))
+		msg = DNS_NO_BOOTSTRAP;
+	else if (full && length(tunnelled))
+		msg = sprintf(DNS_TUNNELLED, join(', ', tunnelled), join(', ', boot));
+
+	attention_set('dns_bootstrap', msg, { servers: tunnelled, bootstrap: boot });
+}
+
+function report_rule_errors(model) {
+	let bad = filter(model.errors, (e) => match(e.section ?? '', /^r_/) || e.option == 'rules');
+
+	if (length(bad))
+		state.attention_add('rules_invalid', sprintf('%d routing rule(s) are invalid and were skipped.', length(bad)),
+			{ count: length(bad) });
+	else
+		state.attention_clear('rules_invalid');
+}
+
+// Shadow cannot run: tear down what runs and show why. `enabled` stays as it is (the user still wants
+// Shadow on, it only cannot run).
+function fail_off(err, armed) {
+	if (armed || armed_leftovers())
+		teardown(true);
+
+	if (index(ATTENTION_CODES, err.code) >= 0)
+		state.attention_add(err.code, err.error);
+
+	state.log('error', err.error);
+	state.write({ phase: 'error', message: err.error, code: err.code });
+
+	return { ok: false, error: err.error };
+}
+
+// Failure once the system was touched: undo everything at once.
+function fail_after_apply(err) {
+	teardown(true);
+
+	return fail_off(err, false);
+}
+
+function rm_tree(dir) {
+	for (let f in lsdir(dir) ?? [])
+		unlink(`${dir}/${f}`);
+
+	rmdir(dir);
+}
+
+function converge_once(opts) {
+	let c = cursor();
+	let model = config.load(c);
+	let m = model.main;
+
+	state.set_log_level(m.log_level);
+	report_rule_errors(model);
+
+	// autostart=0 means a reboot ends in a real Off, not an On with nothing running
+	if (opts.boot && m.enabled && !m.autostart) {
+		c.set(C.UCI, 'main', 'enabled', '0');
+		c.commit(C.UCI);
+		m.enabled = false;
+		state.log('info', 'Autostart is off: Shadow is turned off after the reboot.');
+	}
+
+	if (opts.connect)
+		clear_fatal();
+
+	let armed = access(`${R}/active`) == true;
+
+	if (!m.enabled || !config.targets(model)) {
+		if (armed || armed_leftovers())
+			teardown(m.enabled);
+
+		// nothing of ours runs, so no lookup can bypass a tunnel
+		state.attention_clear('dns_upstream_leak');
+		state.attention_clear('dns_bootstrap');
+
+		if (!m.enabled) {
+			// Off: the flags a stop kept are gone, and with them what they and the run they stopped reported
+			for (let f in KEEP_ON)
+				unlink(`${R}/${f}`);
+
+			for (let code in [ ...ATTENTION_CODES, 'dns_bootstrap' ])
+				state.attention_clear(code);
+
+			state.write({ phase: 'disconnected', message: '', code: null, transport: m.transport, target: null });
+
+			return { ok: true };
+		}
+
+		let msg = 'Nothing to route: turn on a domain list, add a rule, or switch to Proxy all.';
+
+		state.attention_add('nothing_to_route', msg);
+		state.write({ phase: 'error', message: msg, code: 'nothing_to_route', transport: m.transport });
+
+		return { ok: true };
+	}
+
+	state.attention_clear('nothing_to_route');
+
+	let sysc = cursor();
+	let ctx = gather(model, sysc, armed);
+
+	if (ctx.error)
+		return fail_off(ctx, armed);
+
+	report_dns(model, ctx);
+
+	rm_tree(NEXT);
+	state.ensure_run();
+	mkdir(NEXT, 0o700);
+
+	let r = render_all(model, ctx, NEXT);
+
+	if (r.error)
+		return fail_off(r, armed);
+
+	let chk = run_checks(model, ctx, NEXT, armed);
+
+	if (chk.error) {
+		rm_tree(NEXT);
+		return fail_off(chk, armed);
+	}
+
+	let ap = apply_system(model, ctx, NEXT, chk, armed, r.files);
+
+	rm_tree(NEXT);
+
+	if (ap.error)
+		return fail_after_apply(ap);
+
+	for (let code in [ 'port_busy', 'dns_rejected', 'nft_rejected' ])
+		state.attention_clear(code);
+
+	// a fatal stop's attention goes with its flag (a Connect, a changed server or config cleared it); while
+	// an instance stays parked it stays too
+	if (!access(`${R}/xray.fatal`))
+		state.attention_clear('xray_config');
+
+	if (!access(`${R}/fatal`))
+		state.attention_clear('ssh_fatal');
+
+	let prev = state.read();
+	// A fatal stop that this converge did not clear (no Connect, no changed server or config): the instance
+	// stays parked, so the error it showed stays too instead of a "Connecting" that never ends.
+	let parked = parked_fatal(m.transport);
+	let ssh_mode = (m.transport == 'ssh');
+	let moved = !armed || prev.target?.addr != ctx.target.addr;
+	// Only a restart of the instance that reports the phase starts a new "Connecting": in SSH mode that is
+	// ssh (ssh-up writes "connected"); xray restarting alone (kill switch, IPv6, log level, a fixed config)
+	// keeps the session. In Xray mode xray-run's watcher reports, and an error phase restarts it.
+	let restarting = !parked && (ssh_mode ? (moved || ap.ssh_restarts || opts.connect)
+		: (moved || chk.xray_changed || prev.phase == 'error'));
+	let patch = { transport: m.transport, target: ctx.target };
+
+	if (parked) {
+		if (prev.phase != 'error')
+			patch = { ...patch, phase: 'error', message: parked.message, code: parked.code };
+	}
+	else {
+		patch.code = null;
+
+		if (restarting) {
+			patch.phase = 'connecting';
+			patch.attempt = 0;
+			patch.message = (m.transport == 'xray')
+				? sprintf('Starting %s profile %s.', uc(ctx.target.protocol ?? 'xray'), ctx.target.name)
+				: sprintf('Connecting to %s.', ctx.target.addr);
+		}
+		else if (ssh_mode && prev.phase == 'error') {
+			// the error was xray's (its config error is fixed) while ssh kept running: show ssh as it is;
+			// ssh-run reports the next change itself
+			let s = ssh.session(ctx.sel.sid);
+
+			patch.phase = s.up ? 'connected' : 'connecting';
+			patch.attempt = 0;
+			patch.message = s.up ? sprintf('Connected to %s.', ctx.sel.name || ctx.sel.host)
+				: sprintf('Connecting to %s.', ctx.target.addr);
+		}
+	}
+
+	state.write(patch);
+
+	let gen = token();
+
+	put(`${R}/applied`, `${gen}\n`, 0o600);
+
+	return {
+		ok: true, gen,
+		check: m.check_after_connect && m.transport == 'xray' && restarting
+	};
+}
+
+function cmd_converge(opts) {
+	let res = { ok: false };
+
+	// A hook that found the lock busy leaves `pending`; whoever holds the lock converges again.
+	for (let round = 0; round < 5; round++) {
+		let lk = lock(true);
+
+		if (!lk)
+			return 1;
+
+		unlink(`${R}/pending`);
+		res = converge_once(opts);
+		opts.boot = false;
+		opts.connect = false;
+		lk.close();
+
+		if (!access(`${R}/pending`))
+			break;
+	}
+
+	if (!opts.from_init)
+		declare();
+
+	if (res.gen)
+		spawn_job('post-start', res.gen, ...(res.check ? [ '--check' ] : []));
+
+	return res.ok ? 0 : 1;
+}
+
+function cmd_teardown(opts) {
+	let lk = lock(true);
+
+	if (!lk)
+		return 1;
+
+	teardown();
+	lk.close();
+
+	if (!opts.from_init)
+		declare();
+
+	return 0;
+}
+
+// Detached after a converge: DESIGN.md 6.3 step 6.
+function cmd_post_start(gen, opts) {
+	// dnsmasq restarts once xray listens; with the gate open its conf does not use xray
+	for (let i = 0; i < 20 && read_trim(`${R}/gate`) != 'accept' && !tcp_listening(C.PORT_TPROXY); i++)
+		sleep(500);
+
+	let lk = lock(true);
+
+	if (!lk)
+		return 1;
+
+	// a newer converge (or a teardown) took over and has its own post-start
+	if (!access(`${R}/active`) || read_trim(`${R}/applied`) != gen) {
+		release(lk);
+		return 0;
+	}
+
+	let info = dnsmasq_info();
+
+	if (!info) {
+		release(lk);
+		return 1;
+	}
+
+	for (let s in state.read_json(`${R}/flush.sets`) ?? [])
+		if (match(s, SET_NAME))
+			sh(`nft flush set ${TABLE} ${s}`);
+
+	unlink(`${R}/flush.sets`);
+
+	if (access(`${R}/dnsmasq.restart`)) {
+		unlink(`${R}/dnsmasq.restart`);
+		unlink(`${R}/dnsmasq.hup`);
+
+		if (!dnsmasq_restart(info.name)) {
+			for (let f in dns_files(info))
+				unlink(f);
+
+			dnsmasq_restart(info.name);
+
+			let err = fail('dns_rejected', 'DNS configuration rejected: dnsmasq did not start with Shadow\'s DNS file, so Shadow was turned off.');
+
+			fail_after_apply(err);
+			release(lk);
+			declare();
+
+			return 1;
+		}
+	}
+	else if (access(`${R}/dnsmasq.hup`)) {
+		unlink(`${R}/dnsmasq.hup`);
+		dnsmasq_hup(info.name);
+	}
+
+	sh(`${C.LIBEXEC}/gate-set --locked`);
+	release(lk);
+
+	if (opts.check) {
+		sleep(2000);
+		sh(`${C.LIBEXEC}/tunnel-check`);
+	}
+
+	return 0;
+}
+
+function cmd_render(dir, opts) {
+	if (!dir || substr(dir, 0, 1) != '/') {
+		warn('usage: apply render <absolute dir> [--config <uci confdir>]\n');
+		return 2;
+	}
+
+	state.mkdir_p(dir, 0o700);
+
+	let model = config.load(opts.config ? cursor(opts.config) : cursor());
+	let ctx = gather(model, cursor(), false);
+	let r = ctx.error ? ctx : render_all(model, ctx, dir);
+
+	print(sprintf('%J\n', { ok: !r.error, error: r.error, code: r.code, files: r.files, errors: model.errors }));
+
+	return r.error ? 1 : 0;
+}
+
+// fw4-hook --iface after an ifup outside the WAN zone (hotplug: no lock, no waiting): converge when the LAN
+// side differs from what the render used, a new LAN-zone device or a new delegated prefix, say.
+function cmd_lan_check() {
+	if (!access(`${R}/active`))
+		return 0;
+
+	let l = lan_info(cursor(), ubus_call('network.interface', 'dump'));
+
+	if (lan_state({ lan_ifs: l.ifs, local_nets: l.local_nets }) != readfile(`${R}/lan_state`))
+		spawn_job('converge');
+
+	return 0;
+}
+
+// xray-run found a config error in a crash loop: record it without the lock (we run inside procd).
+function cmd_xray_fatal(file) {
+	let text = (file && substr(file, 0, length(R) + 1) == `${R}/`) ? readfile(file) : null;
+	let msg = xray_rejected(text);
+
+	state.attention_add('xray_config', msg);
+	state.write({ phase: 'error', message: msg, code: 'xray_config' });
+	state.log('error', msg);
+
+	return 0;
+}
+
+function cmd_state(phase, message, code) {
+	let patch = { phase, message: message ?? '' };
+
+	if (code != null)
+		patch.code = code;
+
+	state.write(patch);
+
+	return 0;
+}
+
+let opts = parse_flags(slice(ARGV, 1));
+let rc = 2;
+
+switch (ARGV[0]) {
+case 'converge':
+	rc = cmd_converge(opts);
+	break;
+
+case 'teardown':
+	rc = cmd_teardown(opts);
+	break;
+
+case 'render':
+	rc = cmd_render(opts.rest[0], opts);
+	break;
+
+case 'post-start':
+	rc = cmd_post_start(opts.rest[0], opts);
+	break;
+
+case 'xray-fatal':
+	rc = cmd_xray_fatal(opts.rest[0]);
+	break;
+
+case 'lan-check':
+	rc = cmd_lan_check();
+	break;
+
+case 'state':
+	rc = cmd_state(opts.rest[0], opts.rest[1], opts.rest[2]);
+	break;
+
+default:
+	warn('usage: apply converge|teardown|render <dir>\n');
+}
+
+exit(rc);

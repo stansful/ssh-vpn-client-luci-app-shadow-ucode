@@ -8,8 +8,8 @@ const PHASES = [ 'disconnected', 'connecting', 'connected', 'reconnecting', 'err
 const JOB_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const JOBS_KEPT = 20;
 const METRICS_MAX = 1048576, HTTP_OK = /^HTTP\/1\.[01] 200 /;
-const PRIORITY = { error: 'daemon.err', warning: 'daemon.warn', info: 'daemon.info' };
-const SEVERITY = { error: 3, warning: 2, info: 1 };
+const PRIORITY = { error: 'daemon.err', warning: 'daemon.warn', info: 'daemon.info', debug: 'daemon.debug' };
+const SEVERITY = { error: 3, warning: 2, info: 1, debug: 0 };
 
 let log_threshold = SEVERITY.warning;
 
@@ -83,6 +83,42 @@ function with_lock(name, fn) {
 	return result;
 }
 
+// Desktop redactSecrets, plus the places where xray -test echoes a malformed credential.
+function redact(text) {
+	if (type(text) != 'string')
+		return text;
+
+	text = replace(text, /"([A-Za-z0-9_-]*password|auth)"[ \t]*:[ \t]*"([^"\\]|\\.)*"/gi, '"$1":"<redacted>"');
+	text = replace(text, /([a-z0-9+.-]:\/\/)[^ \t\r\n\/?#@]+@/gi, '$1<redacted>@');
+	text = replace(text, /(password|passphrase|private key|proxy uri|uri)[ \t]*[:=][ \t]*[^ \t\r\n]+/gi, '$1=<redacted>');
+	text = replace(text, /(invalid UUID:|invalid "password":|"shortId":|shortId:|invalid short ?[Ii][Dd]:?)[^\r\n]*/g, '$1 <redacted>');
+
+	return text;
+}
+
+// Settings → Logs (main.log_level, DESIGN.md 6.8); anything unknown counts as the default, warning.
+function set_log_level(level) {
+	log_threshold = SEVERITY[level] ?? SEVERITY.warning;
+}
+
+// Helpers that do not converge take the level the last converge validated (RUN/log_level): a file read
+// instead of a UCI parse, as some of them run inside ssh's LocalCommand or fw4's lock.
+function load_log_level() {
+	set_log_level(trim(readfile(`${RUN}/log_level`) ?? ''));
+}
+
+// Whether log(level, …) would write: callers skip building a debug line nobody will see.
+function log_on(level) {
+	return (SEVERITY[level] ?? SEVERITY.error) >= log_threshold;
+}
+
+function log(level, message) {
+	if (!log_on(level))
+		return;
+
+	system([ 'logger', '-t', LOG_TAG, '-p', PRIORITY[level] ?? PRIORITY.error, redact(message) ]);
+}
+
 function default_state() {
 	return { phase: 'disconnected', since: 0, since_up: null, attempt: 0, message: '', code: null, transport: null, target: null };
 }
@@ -100,9 +136,11 @@ function read() {
 }
 
 // Merges `patch` into state.json. A phase change stamps `since` (and `since_up`, the same moment on the
-// uptime clock, which status turns into the age LuCI shows) unless the patch sets it.
+// uptime clock, which status turns into the age LuCI shows) unless the patch sets it, and is logged at
+// info: every writer (apply, xray-run, ssh-run, ssh-up) goes through here.
 function write(patch) {
-	return with_lock('state', () => {
+	let changed = null;
+	let res = with_lock('state', () => {
 		let s = read();
 
 		if (patch?.phase != null && index(PHASES, patch.phase) < 0)
@@ -110,15 +148,25 @@ function write(patch) {
 
 		let next = { ...s, ...patch };
 
-		if (patch?.phase != null && patch.phase != s.phase && patch.since == null) {
-			next.since = time();
-			next.since_up = uptime();
+		if (patch?.phase != null && patch.phase != s.phase) {
+			changed = s.phase;
+
+			if (patch.since == null) {
+				next.since = time();
+				next.since_up = uptime();
+			}
 		}
 
 		write_json(STATE, next);
 
 		return next;
 	});
+
+	// after the lock: logger forks, and the next writer should not wait for it
+	if (changed != null)
+		log('info', `phase: ${changed} -> ${res.phase}${length(res.message ?? '') ? ` (${res.message})` : ''}`);
+
+	return res;
 }
 
 function attention_list() {
@@ -213,19 +261,6 @@ function job_write(id, patch) {
 	return job;
 }
 
-// Desktop redactSecrets, plus the places where xray -test echoes a malformed credential.
-function redact(text) {
-	if (type(text) != 'string')
-		return text;
-
-	text = replace(text, /"([A-Za-z0-9_-]*password|auth)"[ \t]*:[ \t]*"([^"\\]|\\.)*"/gi, '"$1":"<redacted>"');
-	text = replace(text, /([a-z0-9+.-]:\/\/)[^ \t\r\n\/?#@]+@/gi, '$1<redacted>@');
-	text = replace(text, /(password|passphrase|private key|proxy uri|uri)[ \t]*[:=][ \t]*[^ \t\r\n]+/gi, '$1=<redacted>');
-	text = replace(text, /(invalid UUID:|invalid "password":|"shortId":|shortId:|invalid short ?[Ii][Dd]:?)[^\r\n]*/g, '$1 <redacted>');
-
-	return text;
-}
-
 // The reason in xray's "Failed to start: ..." line (else its last line), redacted and cut from the
 // front as the desktop does; null when xray printed nothing.
 function xray_failure(output) {
@@ -252,17 +287,6 @@ function xray_failure(output) {
 	reason = redact(reason);
 
 	return (length(reason) > 400) ? '…' + substr(reason, -400) : reason;
-}
-
-function set_log_level(level) {
-	log_threshold = SEVERITY[level] ?? SEVERITY.warning;
-}
-
-function log(level, message) {
-	if ((SEVERITY[level] ?? SEVERITY.error) < log_threshold)
-		return;
-
-	system([ 'logger', '-t', LOG_TAG, '-p', PRIORITY[level] ?? PRIORITY.error, redact(message) ]);
 }
 
 function now_ms() {
@@ -333,6 +357,6 @@ function tunnel_health(timeout_ms) {
 
 export {
 	read, write, attention_add, attention_dismiss, attention_list, attention_clear,
-	job_write, job_read, valid_job_id, redact, xray_failure, set_log_level, log, tunnel_health,
+	job_write, job_read, valid_job_id, redact, xray_failure, set_log_level, load_log_level, log_on, log, tunnel_health,
 	read_json, write_json, ensure_run, mkdir_p, uptime
 };

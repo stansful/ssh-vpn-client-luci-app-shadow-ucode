@@ -68,8 +68,10 @@ function shq(s) {
 	return "'" + replace(s, "'", "'\\''") + "'";
 }
 
+// At the Settings → Logs level (DESIGN.md 6.8): ssh-run and ssh-up run under procd and ssh, not after a
+// converge, so step() and session_up() load the level the last converge left in RUN.
 function syslog(prio, msg) {
-	system([ 'logger', '-t', 'shadow-vpn', '-p', 'daemon.' + prio, msg ]);
+	state.log((prio == 'err') ? 'error' : prio, msg);
 }
 
 function is_int(v, min, max) {
@@ -442,13 +444,14 @@ function publish(phase, server, attempt, message, code) {
 	});
 }
 
-// The ssh lines go to the -E file; the Log tab reads logd, so pass the end of each run on.
+// The ssh lines go to the -E file; the Log tab reads logd, so pass the end of each run on. They reach logd
+// only when the next run starts, maybe hours later and stamped with that time: each says so.
 function forward_log(log) {
 	let lines = filter(split(log, '\n'), l => length(trim(l)) && !match(l, /^(Transferred|Bytes per second):/));
 	let p = length(lines) ? popen('logger -t ssh -p daemon.notice >/dev/null 2>&1', 'w') : null;
 
 	if (p) {
-		p.write(join('\n', slice(lines, -FORWARD_LINES)) + '\n');
+		p.write(join('\n', map(slice(lines, -FORWARD_LINES), (l) => `[previous run] ${l}`)) + '\n');
 		p.close();
 	}
 }
@@ -497,6 +500,7 @@ export function plan(sid) {
 
 	// A Connect restarts the instance with a new generation: what the old series left is history.
 	if (!st.fresh && st.gen != instance_gen()) {
+		syslog('debug', `ssh: ${sid} starts a new generation (Connect or a changed server); the last run is not classified`);
 		forward_log(log);
 		writefile(file(sid, 'log'), '');
 		unlink(file(sid, 'state'));
@@ -506,8 +510,10 @@ export function plan(sid) {
 	// Nothing to classify unless ssh ran: one that died before it wrote anything (launch() sends its
 	// stderr to the log as well) is a failed run all the same, or procd would start it again every 2 s
 	// without a backoff.
-	if (!length(trim(log)) && !st.launched)
+	if (!length(trim(log)) && !st.launched) {
+		syslog('debug', `ssh: ${sid} has no run to classify; launching`);
 		return '0';
+	}
 
 	let server = load_params(sid);
 	let res = classify(log, context(sid));
@@ -542,6 +548,8 @@ export function plan(sid) {
 
 	publish('reconnecting', server, st.attempt, msg, res.code);
 	syslog('warning', `ssh: ${res.message} Reconnecting ${delay ? `in ${delay} s` : 'now'}.`);
+	syslog('debug', sprintf('ssh: %s classified as %s, %d failure(s) in a row%s', sid, res.code ?? 'unknown', st.fails,
+		had_session ? ', after a session' : ''));
 
 	return `${delay}`;
 };
@@ -725,6 +733,8 @@ export function launch(sid) {
 	// plan() classifies this run even when its log stays empty
 	st.launched = true;
 	save_state(sid, st);
+	syslog('debug', sprintf('ssh: %s launches to %s port %s (%s, attempt %d)', sid, addr.ip, server.port,
+		(server.host == addr.ip) ? 'an address' : `resolved from ${server.host}`, st.attempt));
 
 	// stderr goes to the log too: ssh reports some errors (a user name it refuses) before -E applies
 	return sprintf('export SSH_ASKPASS=%s SSH_ASKPASS_REQUIRE=force SHADOW_ID=%s; unset DISPLAY; exec %s 2>>%s',
@@ -734,6 +744,8 @@ export function launch(sid) {
 // step(name, sid) -> exit code for ssh-run. The answer goes to fd 3, so nothing that a module or a
 // child process prints can end up in the line ssh-run evaluates.
 export function step(name, sid) {
+	state.load_log_level();
+
 	let out = (name == 'plan') ? plan(sid) : (name == 'launch') ? launch(sid) : null;
 
 	if (out == null)
@@ -794,6 +806,8 @@ export function session_up(sid) {
 	if (type(sid) != 'string' || !match(sid, SERVER_SID))
 		return false;
 
+	state.load_log_level();
+
 	let st = read_state(sid), server = load_params(sid);
 
 	st.up_at = uptime();
@@ -802,6 +816,8 @@ export function session_up(sid) {
 	st.attempt = 0;
 	save_state(sid, st);
 	publish('connected', server, 0, `Connected to ${server?.name || server?.host || sid}.`, null);
+	// the session's own "Authenticated to" stays in the -E file until the next run forwards it
+	syslog('debug', sprintf('ssh: %s session up to %s', sid, trim(readfile(file(sid, 'addr')) ?? '') || server?.host || '?'));
 	// the fatal stop it reported is over once a session runs again (DESIGN §6.6: until the cause is gone)
 	state.attention_clear('ssh_fatal');
 

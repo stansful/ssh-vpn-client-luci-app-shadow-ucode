@@ -276,7 +276,8 @@ function paths(opts) {
 
 	return {
 		state: at(opts.run, UPDATE.state), run: at(opts.run, UPDATE.run), work: at(opts.run, UPDATE.work),
-		base_url: at(opts.run, UPDATE.base_url), active: `${opts.run ?? RUN}/active`, auto: at(opts.etc, UPDATE.auto),
+		base_url: at(opts.run, UPDATE.base_url), active: `${opts.run ?? RUN}/active`, quick: `${opts.run ?? RUN}/xray.quick`,
+		auto: at(opts.etc, UPDATE.auto),
 		lock: opts.lock ?? UPDATE.lock
 	};
 }
@@ -822,6 +823,10 @@ function restart(ctx, before) {
 
 	if (!length(kept))
 		return;
+
+	// a deliberate restart, like a Connect: the new xray-run must not take the old run for an exit (DESIGN.md 6.8)
+	if (index(kept, 'xray') >= 0)
+		fs.unlink(ctx.p.quick);
 
 	for (let name in kept)
 		sh(ctx, [ 'ubus', 'call', 'service', 'delete', sprintf('%J', { name: 'shadow-vpn', instance: name }) ]);

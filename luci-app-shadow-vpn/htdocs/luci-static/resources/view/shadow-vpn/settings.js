@@ -84,10 +84,12 @@ return view.extend({
 		s = m.section(form.NamedSection, 'main', 'shadow', _('Logs'));
 
 		o = s.option(form.ListValue, 'log_level', _('Detail'));
+		o.value('debug', _('Debug', 'log'));
 		o.value('info', _('Detailed'));
 		o.value('warning', _('Warnings and errors'));
 		o.value('error', _('Errors only'));
 		o.default = 'warning';
+		o.description = _('Detailed adds what you did in LuCI, restarts and their reasons, and Xray’s info lines: several for every connection through the tunnel (the device’s address and the site’s name), the tunnel switching to its fallback, failed connections to the server. Debug also adds every step Shadow takes. With traffic, both fill the system log within minutes: go back to Warnings and errors once you are done.');
 
 		s = m.section(form.NamedSection, 'main', 'shadow', _('Updates'));
 

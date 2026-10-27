@@ -20,6 +20,23 @@ uptime_s() {
 	echo "${up%.*}"
 }
 
+# Settings → Logs as the last converge validated it (DESIGN.md 6.8); none yet counts as warning
+LOG_LEVEL=
+[ -s "$RUN/log_level" ] && read -r LOG_LEVEL < "$RUN/log_level"
+
+# log <err|warn|info|debug> <text>: Shadow's lines at that level, as state.log() does
+log() {
+	local prio="$1"
+	shift
+	case "$LOG_LEVEL" in
+		debug) ;;
+		info) [ "$prio" = debug ] && return 0 ;;
+		error) [ "$prio" = err ] || return 0 ;;
+		*) [ "$prio" = err ] || [ "$prio" = warn ] || return 0 ;;
+	esac
+	logger -t shadow-vpn -p "daemon.$prio" "$*"
+}
+
 listening() {
 	grep -qE '^ *[0-9]+: (0100007F|7F000001):3039 [0-9A-F]{8}:0000 0A ' /proc/net/tcp
 }
@@ -47,18 +64,21 @@ watch() {
 
 	while [ $i -lt $WATCH_MAX ]; do
 		if listening; then
+			log debug "xray: listening ${i} s after its start"
 			rm -f "$RUN/xray.down"
 			"$LIBEXEC/gate-set"
 			set_state connected ""
 			exit 0
 		fi
 		if [ $opened = 0 ] && [ "$(down_for)" -ge $FALLBACK_SEC ]; then
+			log debug "xray: down for ${FALLBACK_SEC} s or more; asking gate-set"
 			"$LIBEXEC/gate-set"
 			opened=1
 		fi
 		sleep 1
 		i=$((i + 1))
 	done
+	log warn "xray: not listening ${WATCH_MAX} s after its start"
 	"$LIBEXEC/gate-set"
 	exit 0
 }
@@ -114,7 +134,7 @@ if [ "$quick" -ge "$QUICK_MAX" ]; then
 			touch "$RUN/xray.fatal"
 			"$LIBEXEC/apply" xray-fatal "$RUN/xray.test" >/dev/null 2>&1
 			rm -f "$RUN/xray.test"
-			logger -t shadow-vpn -p daemon.err "xray: configuration error, not restarting until the next Connect"
+			log err "xray: configuration error, not restarting until the next Connect"
 			park
 		fi
 		rm -f "$RUN/xray.test"
@@ -127,14 +147,19 @@ if [ "$quick" -ge "$QUICK_MAX" ]; then
 		n=$((n + 1))
 	done
 	[ $delay -gt 60 ] && delay=60
-	logger -t shadow-vpn -p daemon.warn "xray: exited $quick times in a row, next start in ${delay}s"
+	log warn "xray: exited $quick times in a row, next start in ${delay}s"
 	start_watcher
 	sleep "$delay"
 fi
 
-# a previous start in this cycle means xray died: show it as reconnecting
-[ "${last:-0}" -gt 0 ] && set_state reconnecting "Xray runtime exited; restarting."
+# A previous start in this cycle means xray died (a converge that changes xray.json, a Connect and a teardown
+# remove xray.quick): show it as reconnecting. A single exit is otherwise silent, procd and xray log nothing.
+if [ "${last:-0}" -gt 0 ]; then
+	[ "$quick" -lt "$QUICK_MAX" ] && log warn "xray: exited, the previous start was $((now - last)) s ago; starting again"
+	set_state reconnecting "Xray runtime exited; restarting."
+fi
 echo "$quick $(uptime_s) $tested" > "$RUN/xray.quick"
 
+log debug "xray: starting (generation ${SHADOW_GEN:-none}, quick exits $quick)"
 start_watcher
 exec "$XRAY" run -c "$CONF"

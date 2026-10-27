@@ -99,6 +99,36 @@ else {
 	unlink(`${RUN}/pending`);
 	writefile(CONF, UP);
 
+	// Settings → Logs (DESIGN.md 6.8): the level the last converge left in RUN, by the rules of state.log
+	mkdir('/tmp/rt-gate-stub', 0o755);
+	writefile('/tmp/rt-gate-stub/logger', '#!/bin/sh\necho "$*" >> /tmp/rt-gate-logger.txt\n');
+	run('chmod 755 /tmp/rt-gate-stub/logger');
+
+	let seen = {};
+
+	for (let lv in [ '', 'error', 'warning', 'info', 'debug', 'verbose' ]) {
+		unlink('/tmp/rt-gate-logger.txt');
+		writefile(`${RUN}/log_level`, lv ? `${lv}\n` : '');
+		// a verdict change each time: open, then closed again
+		writefile(`${RUN}/fallback`, 'direct\n');
+		writefile(`${RUN}/xray.down`, `${up - 60}\n`);
+		run(`PATH=/tmp/rt-gate-stub:$PATH ${GATE} --locked`);
+		writefile(`${RUN}/fallback`, 'block\n');
+		run(`PATH=/tmp/rt-gate-stub:$PATH ${GATE} --locked`);
+
+		let out = readfile('/tmp/rt-gate-logger.txt') ?? '';
+
+		seen[lv || 'none'] = [ index(out, '-p daemon.warn tunnel gate: accept') >= 0, index(out, '-p daemon.debug tunnel gate: fallback ') >= 0 ];
+	}
+
+	unlink(`${RUN}/log_level`);
+	unlink(`${RUN}/pending`);
+	writefile(CONF, UP);
+	eq('gate/log: the level in RUN decides [the warn line, the debug line]', seen, {
+		none: [ true, false ], error: [ false, false ], warning: [ true, false ], info: [ true, false ],
+		debug: [ true, true ], verbose: [ true, false ]
+	});
+
 	// never wait for the lock (ssh-up runs gate-set synchronously)
 	if (ok('gate/busy: the test holds the lock', hold_lock())) {
 		run(GATE);

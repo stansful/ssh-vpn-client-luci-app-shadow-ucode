@@ -227,6 +227,10 @@ msgid "All events"
 msgstr "Все события"
 
 #: htdocs/luci-static/resources/view/shadow-vpn/log.js:31
+msgid "All but debug"
+msgstr "Всё, кроме отладки"
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:31
 #: htdocs/luci-static/resources/view/shadow-vpn/settings.js:59
 msgid "Warnings and errors"
 msgstr "Предупреждения и ошибки"
@@ -258,6 +262,15 @@ msgstr "Обновить"
 #: htdocs/luci-static/resources/view/shadow-vpn/log.js:43
 msgid "Download"
 msgstr "Скачать"
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:44
+msgctxt "log"
+msgid "Clear"
+msgstr "Очистить"
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:45
+msgid "Hide the lines logged so far, here and in every browser. The system log keeps them."
+msgstr "Скрыть уже записанные строки здесь и во всех браузерах. В системном журнале они остаются."
 
 #: htdocs/luci-static/resources/view/shadow-vpn/log.js:45
 msgctxt "log"
@@ -1059,6 +1072,15 @@ msgstr "Подробность"
 msgid "Detailed"
 msgstr "Подробно"
 
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:58
+msgctxt "log"
+msgid "Debug"
+msgstr "Отладка"
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:62
+msgid "Detailed adds what you did in LuCI, restarts and their reasons, and Xray’s info lines: several for every connection through the tunnel (the device’s address and the site’s name), the tunnel switching to its fallback, failed connections to the server. Debug also adds every step Shadow takes. With traffic, both fill the system log within minutes: go back to Warnings and errors once you are done."
+msgstr "«Подробно» добавляет ваши действия в LuCI, перезапуски с их причинами и информационные строки Xray: по нескольку на каждое соединение через туннель (адрес устройства и имя сайта), переключение туннеля на запасной вариант, неудачные подключения к серверу. «Отладка» добавляет ещё и каждый шаг Shadow. При живом трафике оба уровня заполняют системный журнал за минуты: закончив, верните «Предупреждения и ошибки»."
+
 #: htdocs/luci-static/resources/view/shadow-vpn/settings.js:67
 #: root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
 msgid "Settings"
@@ -1564,6 +1586,10 @@ msgstr "Неверные параметры запроса."
 #. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
 msgid "Unable to start the background job."
 msgstr "Не удалось запустить фоновую задачу."
+
+#. Backend message (rpcd plugin)
+msgid "Unable to clear the log view."
+msgstr "Не удалось очистить журнал."
 
 #. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
 msgid "Internal error. See the system log."

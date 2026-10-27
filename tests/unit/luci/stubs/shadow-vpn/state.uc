@@ -59,4 +59,17 @@ function uptime() {
 	return int(split(readfile('/proc/uptime') ?? '0', ' ')[0]);
 }
 
-export { read, write, attention_list, attention_add, attention_dismiss, attention_clear, job_read, job_write, uptime };
+let log_level = 'warning';
+
+function set_log_level(level) {
+	log_level = level;
+}
+
+// what the plugin logs, with the level it set, for luci_test.uc to read
+function log(level, message) {
+	mkdir(RUN, 0o700);
+	writefile(RUN + '/log.txt', (readfile(RUN + '/log.txt') ?? '') + `${log_level} ${level} ${message}\n`);
+}
+
+export { read, write, attention_list, attention_add, attention_dismiss, attention_clear, job_read, job_write, uptime,
+	set_log_level, log };

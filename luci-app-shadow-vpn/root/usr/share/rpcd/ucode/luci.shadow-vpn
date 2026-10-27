@@ -30,6 +30,7 @@ const LIST_KINDS = [ 'proxy', 'direct' ];
 const JOBS = { converge: [ '--connect' ], check: [], 'list-refresh': LIST_KINDS, 'update-check': [], 'update-install': [] };
 const LOG_TAGS = [ 'shadow-vpn', 'xray', 'xray-run', 'ssh', 'ssh-run', 'ssh-openssh' ];
 const LOG_RE = /^\S+ \S+ +[0-9]+ [0-9:]+ [0-9]+ [a-z0-9]+\.[a-z]+ ([^:\[ ]+)(\[[0-9]+\])?: /;
+const LOG_CLEARED = 'luci: log view cleared';
 const MAX_IMPORT_ERRORS = 500;
 const UNSUPPORTED_PROFILE = "This profile uses an unsupported security mode or transport, so it can't be selected.";
 const UPDATE_RUNNING = 'An update is already running.';
@@ -533,6 +534,9 @@ function set_enabled(req) {
 
 	ctx.set(UCI, 'main', 'enabled', on ? '1' : '0');
 	ctx.commit(UCI);
+	// what the user did, for reading the restarts that follow (DESIGN.md 6.8)
+	state.set_log_level(model.main.log_level);
+	state.log('info', on ? (connect ? 'luci: turned on (Connect)' : 'luci: turned on') : 'luci: turned off');
 
 	return spawn_job('converge', connect ? '--connect' : null);
 }
@@ -548,12 +552,13 @@ function select(req) {
 	const sid = a.sid ?? '';
 	const ctx = open_cursor();
 	const model = config.load(ctx);
+	let item = null;
 
 	if (sid != '') {
 		if (!valid_sid(sid, kind))
 			return { error: 'Invalid arguments.' };
 
-		const item = find_by((kind == 'server') ? model.servers : model.profiles, sid);
+		item = find_by((kind == 'server') ? model.servers : model.profiles, sid);
 
 		if (!item)
 			return { error: (kind == 'server') ? 'SSH configuration does not exist.' : 'Proxy profile does not exist.' };
@@ -580,6 +585,9 @@ function select(req) {
 
 	ctx.set(UCI, 'main', 'transport', a.transport);
 	ctx.commit(UCI);
+	state.set_log_level(model.main.log_level);
+	state.log('info', item ? sprintf('luci: selected %s "%s" (%s), transport %s', kind, item.name, sid, a.transport)
+		: `luci: transport ${a.transport}`);
 	changed();
 
 	return { ok: true };
@@ -1437,7 +1445,7 @@ function redact(line) {
 function logs(req) {
 	const n = req.args?.lines;
 	const want = (type(n) == 'int' && n > 0) ? min(n, 1000) : 300;
-	const out = [];
+	let out = [];
 
 	// Constant arguments only; tags are filtered here and level/text in the browser.
 	const p = popen('/sbin/logread -l 3000 2>/dev/null', 'r');
@@ -1447,7 +1455,14 @@ function logs(req) {
 			const m = match(line, LOG_RE);
 
 			if (m && m[1] in LOG_TAGS) {
-				push(out, redact(rtrim(line, '\n')));
+				line = rtrim(line, '\n');
+
+				// Clear (logs_clear): the page starts at the newest mark, the whole message and nothing else, as
+				// other lines may end with text a link put into a profile name
+				if (m[1] == 'shadow-vpn' && substr(line, length(m[0])) == LOG_CLEARED)
+					out = [];
+
+				push(out, redact(line));
 
 				if (length(out) > want)
 					shift(out);
@@ -1458,6 +1473,14 @@ function logs(req) {
 	}
 
 	return { lines: out };
+}
+
+// logd keeps one ring buffer for every daemon, so Clear hides our lines instead of deleting them: a mark
+// in the log itself, which every browser's next `logs` starts at and `logread` still shows.
+function logs_clear() {
+	const rc = system([ '/usr/bin/logger', '-t', 'shadow-vpn', '-p', 'daemon.notice', LOG_CLEARED ]);
+
+	return (rc == 0) ? { ok: true } : { error: 'Unable to clear the log view.' };
 }
 
 function attention_dismiss(req) {
@@ -1733,6 +1756,7 @@ return {
 		check: method({}, check),
 		job_status: method({ id: 'id' }, job_status),
 		logs: method({ lines: 300 }, logs),
+		logs_clear: method({}, logs_clear),
 		attention_dismiss: method({ id: 'id' }, attention_dismiss),
 		settings_set: method({ values: {} }, settings_set),
 

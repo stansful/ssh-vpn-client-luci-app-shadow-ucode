@@ -14,7 +14,7 @@ config shadow 'main'
 	option dns_redirect '0'
 	option router_traffic '0'
 	option lists_refresh '12'
-	option log_level 'info'
+	option log_level 'debug'
 	option update 'auto'
 
 config list 'proxy'

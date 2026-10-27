@@ -104,6 +104,8 @@ function refresh(kind) {
 function report(r, level) {
 	if (!r.ok)
 		log(level ?? 'warning', sprintf('The %s list was not refreshed: %s', r.kind, r.error));
+	else
+		log('debug', sprintf('lists: %s refreshed %s, %d domains, %s', r.kind, r.via, r.count, r.changed ? 'changed' : 'unchanged'));
 
 	return r;
 }

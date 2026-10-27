@@ -275,6 +275,27 @@ ssh.session_up(SID);
 writefile(LOG, PW_LOG);
 eq('plan: a new generation starts at once', plan_in_gen('g2'), '0');
 check('plan: ...forgetting the old series', !stat(STATE) && readfile(LOG) == '' && !stat(`${RUN}/fatal`), sprintf('%J', run_state()));
+
+// The old series' log goes to logd when the next run starts, stamped with that time: each line says so
+// (DESIGN.md 6.8), at most the last 40, without the transfer statistics.
+{
+	let lines = [];
+
+	for (let i = 0; i < 50; i++)
+		push(lines, `debug1: line ${i}`);
+
+	sh(`mkdir -p /tmp/ssh-fw-stub && printf '#!/bin/sh\\ncat >> /tmp/ssh-fw.txt\\n' > /tmp/ssh-fw-stub/logger && chmod 755 /tmp/ssh-fw-stub/logger && rm -f /tmp/ssh-fw.txt`);
+	reset();
+	ssh.launch(SID);
+	writefile(LOG, join('\n', lines) + '\nTransferred: sent 1, received 2 bytes\n');
+	sh(`PATH=/tmp/ssh-fw-stub:$PATH SHADOW_GEN='g4' ucode -S ${MODPATH} -e 'import { plan } from "shadow-vpn.ssh"; plan("${SID}");'`);
+
+	let fw = filter(split(readfile('/tmp/ssh-fw.txt') ?? '', '\n'), (l) => l != '');
+
+	check('plan: forwarded ssh lines are marked as the previous run\'s, the last 40, no statistics',
+		length(fw) == 40 && fw[0] == '[previous run] debug1: line 10' && fw[39] == '[previous run] debug1: line 49' &&
+		!length(filter(fw, (l) => index(l, 'Transferred') >= 0)), join('\n', fw));
+}
 reset();
 writefile(LOG, PW_LOG);
 eq('plan: a first run without a state file classifies its log', plan_in_gen('g3'), 'fatal');

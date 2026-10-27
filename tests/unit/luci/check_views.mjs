@@ -171,6 +171,39 @@ for (const v of VIEWS) {
 const commonMissing = usedIds(fs.readFileSync(commonFile, 'utf8')).filter(id => !ids.has(id));
 check('luci views: common.js msgids are all in the template', !commonMissing.length, commonMissing.join(' | '));
 
+/* The Log page's level of a logread line: procd logs xray's stdout at daemon.info, so xray's own level counts. */
+{
+	const level = classes['shadow-vpn.common']?.logLevel;
+	const T = 'Tue Oct 27 15:23:50 2026';
+	const cases = [
+		[ `${T} daemon.info xray-run[28636]: 2026/10/27 12:23:50.442314 [Warning] app/observatory/burst: error ping`, 'w' ],
+		[ `${T} daemon.info xray-run[28636]: 2026/10/27 12:37:34.399552 [Error] app/dns: failed to retrieve response`, 'e' ],
+		[ `${T} daemon.info xray-run[8212]: 2026/10/27 12:48:09.987899 [Info] infra/conf/serial: Reading config`, '' ],
+		[ `${T} daemon.info xray[8212]: 2026/10/27 12:48:09.987899 [Debug] app/dispatcher: taking detour`, 'd' ],
+		[ `${T} daemon.info xray-run[8212]: Xray 26.3.27 (Xray, Penetrates Everything.) OpenWrt`, '' ],
+		[ `${T} daemon.err xray-run[8212]: panic: runtime error`, 'e' ],
+		// a crash loop's reason: no time and no level, on stdout
+		[ `${T} daemon.info xray-run[8212]: Failed to start: app/proxyman/inbound: failed to listen TCP on 12345`, 'e' ],
+		[ `${T} daemon.info shadow-vpn: Failed to start: not xray's`, '' ],
+		[ `${T} daemon.warn shadow-vpn: tunnel gate: accept`, 'w' ],
+		[ `${T} daemon.debug shadow-vpn: converge: start`, 'd' ],
+		[ `${T} daemon.notice ssh: [previous run] Authenticated to 192.0.2.1 ([192.0.2.1]:22) using "publickey".`, '' ],
+		// another daemon's text that looks like xray's keeps its syslog level
+		[ `${T} daemon.info shadow-vpn: 2026/10/27 12:23:50.442314 [Error] quoted`, '' ]
+	];
+	const wrong = typeof level == 'function' ? cases.filter(c => level(c[0]) !== c[1]).map(c => `${c[0]} -> ${level(c[0])}`) : [ 'no logLevel' ];
+
+	check('luci views: the Log page reads xray’s own level and the syslog one', !wrong.length, wrong.join(' | '));
+
+	// the filters: rows all, nodebug, warn, err; columns e, w, d, ''
+	const shown = classes['shadow-vpn.common']?.logShown;
+	const table = { all: [ 1, 1, 1, 1 ], nodebug: [ 1, 1, 0, 1 ], warn: [ 1, 1, 0, 0 ], err: [ 1, 0, 0, 0 ] };
+	const off = typeof shown == 'function' ? Object.entries(table).flatMap(([ lv, row ]) =>
+		[ 'e', 'w', 'd', '' ].filter((c, i) => shown(c, lv) !== !!row[i]).map(c => `${lv}/${c || 'info'}`)) : [ 'no logShown' ];
+
+	check('luci views: the Log page filters keep exactly their levels', !off.length, off.join(' | '));
+}
+
 /* Backend messages: every sentence the router puts in front of the user (errors, phase messages, attention,
  * tunnel-check details) translates through common.js tr() with the Russian catalog. They are collected from
  * the sources: string literals that read like a sentence, outside log calls; a ${...} or %s stands for a value. */

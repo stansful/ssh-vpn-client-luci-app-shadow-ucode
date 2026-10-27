@@ -221,6 +221,10 @@ msgid "All events"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/shadow-vpn/log.js:31
+msgid "All but debug"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:31
 #: htdocs/luci-static/resources/view/shadow-vpn/settings.js:59
 msgid "Warnings and errors"
 msgstr ""
@@ -251,6 +255,15 @@ msgstr ""
 
 #: htdocs/luci-static/resources/view/shadow-vpn/log.js:43
 msgid "Download"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:44
+msgctxt "log"
+msgid "Clear"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/log.js:45
+msgid "Hide the lines logged so far, here and in every browser. The system log keeps them."
 msgstr ""
 
 #: htdocs/luci-static/resources/view/shadow-vpn/log.js:45
@@ -1044,7 +1057,16 @@ msgid "Detail"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/shadow-vpn/settings.js:58
+msgctxt "log"
+msgid "Debug"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:58
 msgid "Detailed"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js:62
+msgid "Detailed adds what you did in LuCI, restarts and their reasons, and Xray’s info lines: several for every connection through the tunnel (the device’s address and the site’s name), the tunnel switching to its fallback, failed connections to the server. Debug also adds every step Shadow takes. With traffic, both fill the system log within minutes: go back to Warnings and errors once you are done."
 msgstr ""
 
 #: htdocs/luci-static/resources/view/shadow-vpn/settings.js:67
@@ -1557,6 +1579,10 @@ msgstr ""
 
 #. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)
 msgid "Unable to start the background job."
+msgstr ""
+
+#. Backend message (rpcd plugin)
+msgid "Unable to clear the log view."
 msgstr ""
 
 #. Backend message (rpcd plugin, validate.uc, links.uc, keys.uc, ssh, runtime)

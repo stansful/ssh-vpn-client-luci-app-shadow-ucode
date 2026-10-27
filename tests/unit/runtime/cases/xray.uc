@@ -120,6 +120,9 @@ eq('xray/xray: both tproxy inbounds with ipv6=1', map(c.inbounds, (i) => [ i.tag
 	[ [ 'tproxy-in', '127.0.0.1' ], [ 'tproxy6-in', '::1' ], [ 'dns-in', '127.0.0.1' ], [ 'check-in', '127.0.0.1' ] ]);
 eq('xray/xray: DoH answers both families', c.dns.queryStrategy, 'UseIP');
 eq('xray/xray: log level follows log_level', c.log.loglevel, 'error');
+eq('xray/xray: Shadow debug keeps xray at info (its debug logs every connection)',
+	render(model({ transport: 'xray', log_level: 'debug' }, user_rules), { outbound: OUTBOUND, vision: true }).config?.log?.loglevel,
+	'info');
 
 rules = c.routing.rules;
 

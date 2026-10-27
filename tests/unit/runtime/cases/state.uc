@@ -1,8 +1,8 @@
 'use strict';
 
-import { access, unlink, rmdir, glob, readfile } from 'fs';
+import { access, unlink, rmdir, glob, readfile, writefile, mkdir } from 'fs';
 import * as state from 'shadow-vpn.state';
-import { ok, eq, done } from 'rt';
+import { ok, eq, run, done, UCODE } from 'rt';
 
 // redaction: desktop redactSecrets plus what xray -test echoes for malformed credentials
 let r = state.redact;
@@ -33,6 +33,16 @@ let cut = state.xray_failure(`Failed to start: ${long}`);
 
 ok('state/xray_failure: long reasons are cut from the front', index(cut, '…') == 0 && substr(cut, -400) == substr(long, -400) &&
 	length(cut) == length('…') + 400, cut);
+state.set_log_level('debug');
+ok('state/log_on: debug lets every level through', state.log_on('debug') && state.log_on('info') && state.log_on('error'));
+state.set_log_level('info');
+ok('state/log_on: info drops debug only', !state.log_on('debug') && state.log_on('info') && state.log_on('warning'));
+state.set_log_level('error');
+ok('state/log_on: error keeps errors only', !state.log_on('warning') && state.log_on('error'));
+state.set_log_level('verbose');
+ok('state/log_on: an unknown level counts as warning', !state.log_on('info') && state.log_on('warning'));
+state.set_log_level('warning');
+
 ok('state/job ids: traversal refused', !state.valid_job_id('../x') && !state.valid_job_id('a/b') && state.valid_job_id('1761-000000001'));
 eq('state/job_read refuses ../x', state.job_read('../x'), null);
 
@@ -82,6 +92,21 @@ if (!access(RUN)) {
 
 	ok('state/job: finished stamped', j.finished > 0 && j.name == 'converge' && j.result.rc == 0);
 	eq('state/job_read', state.job_read('1761-000000001')?.state, 'done');
+
+	// a phase change is logged at info, once; a merge or the same phase is not; the level file sets the level
+	mkdir('/tmp/rt-state-stub', 0o755);
+	writefile('/tmp/rt-state-stub/logger', '#!/bin/sh\necho "$*" >> /tmp/rt-state-logger.txt\n');
+	run('chmod 755 /tmp/rt-state-stub/logger');
+	unlink('/tmp/rt-state-logger.txt');
+	writefile(`${RUN}/log_level`, 'info\n');
+
+	let r = run(`PATH=/tmp/rt-state-stub:$PATH ${UCODE} -e 'import * as s from "shadow-vpn.state"; s.load_log_level();
+		s.write({ phase: "reconnecting", message: "SSH session lost." }); s.write({ message: "x" }); s.write({ phase: "reconnecting" });
+		s.write({ phase: "connected", message: "", since: 5 }); s.set_log_level("warning"); s.write({ phase: "error" });'`);
+
+	eq('state/write: a phase change is logged at info (load_log_level)', readfile('/tmp/rt-state-logger.txt') ?? r.out,
+		'-t shadow-vpn -p daemon.info phase: connecting -> reconnecting (SSH session lost.)\n' +
+		'-t shadow-vpn -p daemon.info phase: reconnecting -> connected\n');
 
 	for (let f in [ ...(glob(`${RUN}/jobs/*`) ?? []), ...(glob(`${RUN}/*`) ?? []) ])
 		unlink(f);

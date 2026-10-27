@@ -75,7 +75,7 @@ const CSS = `
 .shv-tabs a{padding:8px 14px;cursor:pointer;border-bottom:2px solid transparent;color:var(--shv-muted);text-decoration:none}
 .shv-tabs a.on{border-color:var(--shv-accent);color:inherit;font-weight:600}
 .shv-log{max-height:520px;overflow:auto;padding:12px;border-radius:var(--shv-r);background:var(--shv-soft);border:1px solid var(--shv-line);white-space:pre-wrap;word-break:break-word;line-height:1.55}
-.shv-log .w{color:var(--shv-warn)}.shv-log .e{color:var(--shv-bad)}
+.shv-log .w{color:var(--shv-warn)}.shv-log .e{color:var(--shv-bad)}.shv-log .d{color:var(--shv-muted)}
 .shv-empty{padding:22px;text-align:center;color:var(--shv-muted);border:1px dashed var(--shv-line);border-radius:var(--shv-r)}
 .shv-kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px}
 .shv-kv dt{color:var(--shv-muted)}.shv-kv dd{margin:0;overflow-wrap:anywhere}
@@ -126,6 +126,7 @@ const api = {
 	check: declare('check'),
 	jobStatus: declare('job_status', [ 'id' ]),
 	logs: declare('logs', [ 'lines' ]),
+	logsClear: declare('logs_clear'),
 	attentionDismiss: declare('attention_dismiss', [ 'id' ]),
 	updateStatus: declare('update_status'),
 	updateCheck: declare('update_check'),
@@ -382,6 +383,29 @@ function readFile(file, max) {
 	});
 }
 
+/*
+ * The level of a logread line on the Log page: 'e', 'w', 'd' (debug) or '' (the rest). procd logs an
+ * instance's stdout at daemon.info, so for xray the level is its own [Warning]/[Error]/... after the time, and
+ * its "Failed to start: <reason>" (no time, no level; the reason of a crash loop) is an error.
+ */
+const LOG_LINE = /^\S+ \S+ +\d+ [\d:]+ \d+ [a-z0-9]+\.([a-z]+) ([^:\[ ]+)(?:\[\d+\])?: (?:\d{4}\/\d\d\/\d\d [\d:.]+ \[([A-Za-z]+)\] |(Failed to start: ))?/;
+
+function logLevel(line) {
+	const m = LOG_LINE.exec(line);
+	const x = m && (m[2] == 'xray' || m[2] == 'xray-run');
+	const p = !m ? 'info' : (x && m[4]) ? 'error' : (x && m[3]) ? m[3].toLowerCase() : m[1];
+
+	if (p == 'error' || p == 'err' || p == 'crit' || p == 'alert' || p == 'emerg')
+		return 'e';
+
+	return (p == 'warn' || p == 'warning') ? 'w' : (p == 'debug') ? 'd' : '';
+}
+
+/* Whether a line of level c (logLevel) passes the Log page's filter lv: all, nodebug, warn, err. */
+function logShown(c, lv) {
+	return (lv == 'err') ? c == 'e' : (lv == 'warn') ? (c == 'e' || c == 'w') : (lv == 'nodebug') ? c != 'd' : true;
+}
+
 return baseclass.extend({
 	api: api,
 	el: el,
@@ -401,6 +425,8 @@ return baseclass.extend({
 	versionText: versionText,
 	download: download,
 	readFile: readFile,
+	logLevel: logLevel,
+	logShown: logShown,
 
 	style() {
 		return E('style', {}, [ CSS ]);

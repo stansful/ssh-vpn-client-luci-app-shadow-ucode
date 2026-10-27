@@ -89,7 +89,7 @@ ssh-vpn-client-luci-app-shadow-ucode/
 |---|---|
 | `/etc/config/shadow-vpn` | UCI: settings, servers, keys, profiles, rules (no secrets) |
 | `/etc/shadow-vpn/` (0700) | `secrets/<sid>.{password,passphrase,link}`, `keys/<sid>`, `known_hosts`, `trusted.<sid>`, `fingerprint.key` (the key of the profile identities in UCI, 5), `lists/{proxy,direct}.lst` + `.sha256`, `update.state` (the last automatic update attempt, 11.1). Files 0600, written tmp + fsync + rename (UBIFS: a power cut right after a save must not leave an empty file). Listed in `/lib/upgrade/keep.d/shadow-vpn`, so sysupgrade and backups keep it next to `/etc/config/shadow-vpn` |
-| `/var/run/shadow-vpn/` (tmpfs, 0700) | `xray.json`, `ssh.<sid>.params`, `table.nft` (the full ruleset incl. gate and server elements, used by heals), `dnsmasq.conf` / `dnsmasq.down.conf` (the two DNS variants, 6.5), `state.json`, `attention.json`, `gate`, `fatal`, `ssh.<sid>.{log,state,last}`, `hostkey.<sid>.{seen,status}`, `check.json`, `jobs/*.json`, `patterns`, `wan_dns`, `wan_networks`, `lan_state` (what the iface hook compares, 6.2), `active`; the updater's `update.json`, `update.run.json`, `update.work/` and `update.base_url` (11.1) |
+| `/var/run/shadow-vpn/` (tmpfs, 0700) | `xray.json`, `ssh.<sid>.params`, `table.nft` (the full ruleset incl. gate and server elements, used by heals), `dnsmasq.conf` / `dnsmasq.down.conf` (the two DNS variants, 6.5), `state.json`, `attention.json`, `gate`, `fatal`, `ssh.<sid>.{log,state,last}`, `hostkey.<sid>.{seen,status}`, `check.json`, `jobs/*.json`, `patterns`, `wan_dns`, `wan_networks`, `lan_state` (what the iface hook compares, 6.2), `log_level` (the level the last converge validated, 6.8), `active`; the updater's `update.json`, `update.run.json`, `update.work/` and `update.base_url` (11.1) |
 | `<dnsmasq confdir>/shadow-vpn.conf` | generated `nftset=`, `server=/host/…` (normal upstream for direct names; server hosts and the router's NTP server names on a resolver outside the tunnel, 6.5; `127.0.0.1#5300` for tunnelled ones), `max-ttl` (unless the instance sets `max_ttl`), (full mode) `no-resolv` and the default `server=`, (`ipv6=0`, full mode) `filter-AAAA`, (full mode with no resolver outside the tunnel) `host-record=` for the server names; never a `servers-file=` (6.5); confdir from `dhcp.<sec>.confdir`, default `/tmp/dnsmasq.<sec>.d` for the instance serving `lan` (the only path visible in its ujail). Its temp file is `.shadow-vpn.conf.tmp`: conf-dir skips dot files |
 | `/usr/libexec/shadow-vpn/` | `apply`, `job`, `gate-set`, `ssh-run`, `ssh-up`, `ssh-askpass`, `ssh-hostkey`, `ssh-classify`, `xray-run`, `tunnel-check`, `fw4-hook`, `lists`, `update` |
 | `/var/lock/` | `shadow-vpn.lock` (Shadow's lock, 6.1) and `shadow-vpn-update.lock` (the updater's own, 11.1) |
@@ -129,7 +129,7 @@ config shadow 'main'
 	option dns_redirect '1'         # redirect LAN DNS (port 53) to the router; LAN hosts that are the router's own upstreams are exempt
 	option router_traffic '1'       # the router's own connections follow the same rules
 	option lists_refresh '24'       # hours between automatic list refreshes, 0 = manual only
-	option log_level 'warning'      # info | warning | error (ours and xray's)
+	option log_level 'warning'      # debug | info | warning | error (ours and xray's; debug keeps xray at info, 6.8)
 	option update 'notify'          # manual | notify | auto: updates from GitHub releases (11.1)
 
 config list 'proxy'                 # "Blocked in Russia": Russia/inside-raw.lst
@@ -445,6 +445,46 @@ tunnelled destinations direct 6.8–17 s, back 0.4–3.9 s; `kill -9` of xray �
 "connection refused" in under 1 ms, no hang), back after procd's 5 s respawn (5.0–5.4 s); crash loop with a config
 xray rejects → gate open 10.2–15.4 s, DNS on the normal upstream about 0.3 s later, Connect again after the fix →
 tunnelled in about 1.3 s.
+
+### 6.8 Logs
+
+Everything goes to logd: ours under the tag `shadow-vpn` (`state.log`, and a `log` function of the same rules in
+`xray-run` and `gate-set`), xray's stdout under `xray-run` (procd logs an instance's stdout at `daemon.info`, whatever
+xray's own level), ssh's `-E` file under `ssh`. `main.log_level` (Settings → Logs → Detail) sets one threshold for all
+of ours. Every converge writes the value it validated to `RUN/log_level` (kept over a teardown, so the job that turns
+Shadow on logs at that level from its first line), and the helpers that do not converge read that file instead of
+parsing UCI: `job`, `ssh-run`, `ssh-up` (inside ssh's LocalCommand), `post-start` and the other apply commands,
+`xray-run`, `gate-set` and `fw4-hook` (sourced by fw4 under its lock; its one warning is dropped at `error`).
+`tunnel-check`, `lists` and `update` read UCI as before. A missing file, or a value config.load() would refuse,
+counts as `warning`.
+
+| Level | Adds |
+|---|---|
+| `error` | errors only; xray at `error` |
+| `warning` (default) | warnings: reconnects, the gate, quick xray exits, a single xray exit ("exited, the previous start was N s ago"), xray not listening 120 s after its start, the nft table restored after a firewall flush, failed checks and lists |
+| `info` | what the user did in LuCI (on, off, Connect, a selection), what a converge (re)starts and why (`converge: xray restarts: its configuration changed (…)`, a Connect, a transport switch, a changed server), every phase change (`phase: connected -> reconnecting (…)`), a teardown, `wan-up` restarts of ssh; xray at `info`: several lines for every connection through it (the LAN device's address, the sniffed name, the route, the dial), its observatory probes, the balancer falling back and failed dials to the server |
+| `debug` | every step: converge start and summary (nft table, dnsmasq, gate), post-start (wait for xray, flushed sets, dnsmasq restart or reload, the check), job start and end with its duration, the gate's inputs, ssh-run's plan (classification, failures, backoff) and launch address, list refreshes. xray stays at `info`: its own `debug` adds far more per connection and would push Shadow's lines out of logd's ring buffer within seconds |
+
+`info` and `debug` are meant for a session of debugging: with traffic, xray's per-connection lines turn logd's ring
+buffer (`system.@system[0].log_size`) over within minutes, and they name the LAN devices and the sites they reach,
+which the description under the option says. Switching between the two never restarts xray, as its level is `info`
+for both.
+
+Two things read differently from their stamps without a note. ssh's lines reach logd only when the next run starts
+(`forward_log` in plan(), the last 40 lines), maybe hours after they were written and stamped with that moment, so
+each carries `[previous run]`; the session's start is in the `info` phase change and, at `debug`, `ssh: <sid> session
+up to <ip>`. And a single xray exit leaves nothing in logd but xray-run's warning: procd logs only crash loops and
+xray nothing on a signal. That warning relies on `RUN/xray.quick` meaning "the previous run ended by itself", so
+whoever restarts xray on purpose removes the file first: a converge that changes `xray.json`, a Connect, a teardown
+and the updater's restart of kept instances (11.1).
+
+The Log page classifies a line by its syslog priority, except `xray`/`xray-run` lines, whose level is xray's own
+`[Debug]`/`[Info]`/`[Warning]`/`[Error]` after its timestamp, and whose `Failed to start: <reason>` (no timestamp: the
+reason of a crash loop when `-test` passes, a port taken, say) is an error; filters: all, all but debug, warnings and
+errors, errors. **Clear** (`logs_clear`) cannot delete from logd's one buffer for every daemon, so it logs the mark
+`shadow-vpn: luci: log view cleared` and `logs` starts at the newest line whose whole message is that mark (not one
+that only ends with it: a profile name from a link could): every browser sees the same, `logread` still has
+everything, and a mark that rolled out of the buffer leaves nothing older to hide.
 
 ## 7. Data plane
 
@@ -811,7 +851,7 @@ Menu: `admin/services/shadow-vpn` "Shadow" (order 45), pages as tabs (the approv
 | SSH | servers (table + modal form, host-key status, "Pin this key", "Forget trusted key"); keys (paste or upload, type/format badges, used-by count, show) |
 | Xray | profiles (add link, import many, search, select, pin, rename, show link, delete, delete unpinned, unsupported/insecure badges); the selected profile has the "selected" badge only while the transport is Xray, and Select (which switches the transport) while it is SSH |
 | Routing | mode cards; the two lists (use, refresh, view, count, updated, auto-refresh); rules tabs Domains / IP / Devices (add with validation, enable, delete, import/export JSON compatible with the desktop); device picker from DHCP leases |
-| Log | Shadow, xray and ssh lines, level filter, refresh, download, follow |
+| Log | Shadow, xray and ssh lines, level filter (xray's own level for its lines), refresh, download, clear, follow (6.8) |
 | Settings | tunnel down: kill switch (default) or direct; autostart; UDP over SSH; tunnel DNS; IPv6; redirect LAN DNS to the router; router traffic; log level; updates (mode, status, Check now, Update to X; 11.1); about (versions, the console update command) |
 
 Change from the mock: the "wait before going direct" seconds field is gone; detection time is fixed by the
@@ -855,7 +895,7 @@ observatory (about 10 s) and shown as text.
   to Settings. About keeps the versions and the install.sh one-liner as "Update from the console".
 - **Log:** the plugin runs `/sbin/logread -l <n>` with constant arguments (no shell, no user text), keeps lines
   tagged `shadow-vpn`, `xray`, `ssh` and the tags the helpers really log under (`xray-run`, `ssh-run`,
-  `ssh-openssh`), and the browser filters level and text.
+  `ssh-openssh`) from the newest Clear mark on, and the browser filters level and text (6.8).
 - Theme-neutral: only LuCI classes (`cbi-*`, `btn cbi-button-*`, `alert-message`, `label`, `spinning`, `modal`)
   plus a small injected stylesheet whose colours fall back across themes (bootstrap, argon, aurora, proton2025).
   Nested arrays are not valid `E()` children (they are stringified); children are flattened.

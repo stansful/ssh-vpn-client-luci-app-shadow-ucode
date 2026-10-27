@@ -5,14 +5,8 @@
 'require shadow-vpn.common as common';
 
 const el = common.el;
+const level = common.logLevel;
 const LINES = 1000;
-
-function level(line) {
-	const m = /^\S+ \S+ +\d+ [\d:]+ \d+ [a-z0-9]+\.([a-z]+) /.exec(line);
-	const p = m ? m[1] : 'info';
-
-	return (p == 'err' || p == 'crit' || p == 'alert' || p == 'emerg') ? 'e' : (p == 'warn' || p == 'warning') ? 'w' : '';
-}
 
 return view.extend({
 	handleSaveApply: null,
@@ -35,7 +29,8 @@ return view.extend({
 				this.stick = this.box.scrollHeight - this.box.scrollTop - this.box.clientHeight < 40;
 		} });
 		this.level = el('select', { class: 'cbi-input-select', change: () => this.draw() }, [
-			[ 'all', _('All events') ], [ 'warn', _('Warnings and errors') ], [ 'err', _('Errors only') ]
+			[ 'all', _('All events') ], [ 'nodebug', _('All but debug') ], [ 'warn', _('Warnings and errors') ],
+			[ 'err', _('Errors only') ]
 		].map(o => el('option', { value: o[0] }, [ o[1] ])));
 		this.search = el('input', { type: 'search', class: 'cbi-input-text', placeholder: _('Filter'), input: () => this.draw() });
 
@@ -48,6 +43,9 @@ return view.extend({
 					this.level,
 					common.button(_('Refresh'), null, () => this.refresh().catch(err => common.fail(err))),
 					common.button(_('Download'), null, () => this.save()),
+					common.button(_('Clear', 'log'), null, () => this.clear().catch(err => common.fail(err)), {
+						title: _('Hide the lines logged so far, here and in every browser. The system log keeps them.')
+					}),
 					el('div', { class: 'grow' }, [ this.search ]),
 					common.toggle(true, on => {
 					this.follow = on;
@@ -71,6 +69,14 @@ return view.extend({
 		});
 	},
 
+	/* The router puts a mark into the log; the page shows only what comes after it. */
+	clear() {
+		return common.checked(common.api.logsClear()).then(() => {
+			this.stick = true;
+			return this.refresh();
+		});
+	},
+
 	/* The 5 s poll: while the router does not answer (a reboot, an rpcd restart) one notification, not one
 	 * per poll; the next answer clears the flag. */
 	poll() {
@@ -86,17 +92,7 @@ return view.extend({
 		const lv = this.level.value;
 		const q = this.search.value.trim().toLowerCase();
 
-		return this.lines.filter(l => {
-			const c = level(l);
-
-			if (lv == 'err' && c != 'e')
-				return false;
-
-			if (lv == 'warn' && !c)
-				return false;
-
-			return !q || l.toLowerCase().indexOf(q) >= 0;
-		});
+		return this.lines.filter(l => common.logShown(level(l), lv) && (!q || l.toLowerCase().indexOf(q) >= 0));
 	},
 
 	draw() {

@@ -113,7 +113,7 @@ starting point; tune them in the lab and keep this file and DESIGN.md §6.7 in s
   main: { enabled, autostart, kill_switch, check_after_connect, tunnel_dns, ipv6, dns_redirect, router_traffic: bool,
           transport: 'ssh'|'xray', ssh_server: sid|null, xray_profile: sid|null,
           mode: 'proxy-all'|'selected-rules', check_endpoint: 'host:port', ssh_udp: 'reject'|'direct',
-          lists_refresh: int /* hours, 0 = manual */, log_level: 'info'|'warning'|'error',
+          lists_refresh: int /* hours, 0 = manual */, log_level: 'debug'|'info'|'warning'|'error',
           update: 'manual'|'notify'|'auto' /* default 'notify', DESIGN §11.1 */ },
   lists: { proxy: { enabled: bool }, direct: { enabled: bool } },
   servers:  [ { sid, name, host, port: int, username, auth: 'password'|'key', key: sid|null,
@@ -264,8 +264,10 @@ Host-key files: `ETC/known_hosts` (lines `shadow-<sid> <type> <key>`), `ETC/trus
 // xray.uc
 render(model, ctx) -> { ok, config } | { ok: false, error }   // DESIGN §7.4; ctx: { outbound, vision: bool }
 // state.uc
-read() -> state     write(patch) -> state                       // RUN/state.json
+read() -> state     write(patch) -> state                       // RUN/state.json; a phase change is logged at info
 uptime() -> int                                                 // seconds since boot (since_up, ages)
+set_log_level(level)  log_on(level) -> bool  log(level, message) // debug|info|warning|error, redacted (DESIGN §6.8)
+load_log_level()                                                // set_log_level(RUN/log_level), which every converge writes
 attention_add(code, message, extra?)  attention_dismiss(id)  attention_list()  attention_clear(code)
 job_write(id, patch)  job_read(id)
 tunnel_health(timeout_ms?) -> { alive: bool|null, fallback, delay_ms, answered: bool, probed: bool }
@@ -410,7 +412,7 @@ All methods return quickly; anything slow returns `{ job }` and the view polls `
 | `rules_import` / `rules_export` | `text, apply: bool` / — | `{ total, imported, skipped: { unsupported, invalid, duplicates, malformed } }` / `{ json }` |
 | `leases` | — | `{ leases: [{ name, ip, mac }] }` |
 | `check` / `job_status` | — / `id` | `{ job }` / job JSON |
-| `logs` | `lines` | `{ lines: [string] }` (constant `logread` args; filter by tag in ucode) |
+| `logs` / `logs_clear` | `lines` / — | `{ lines: [string] }` (constant `logread` args; filter by tag in ucode; starts at the newest Clear mark) / `{ ok } \| { error }` (logs the mark `shadow-vpn: luci: log view cleared`; DESIGN §6.8) |
 | `attention_dismiss` | `id` | `{ ok }` |
 | `settings_set` | `values: { mode?, check_endpoint?, lists_refresh? }` | `{ ok } \| { errors: { field: message } }`; converges only when `mode` changed |
 | `update_status` | — | `{ mode, installed, latest, available, console, url, published, notes, checked_age, check_ok, check_error, running: { stage, version, auto, age } \| null, last: { ok, changed, from, to, error, auto, rolled_back, age } \| null, auto: { version, tries, ok, finished, error, stopped } \| null, clock: { time: 'HH:MM', zone } }` |

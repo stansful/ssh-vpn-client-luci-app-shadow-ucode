@@ -1007,7 +1007,7 @@ function apply_system(model, ctx, dir, chk, armed, files) {
 	put(`${R}/active`, '', 0o600);
 
 	// procd restarts the ssh instance only when its command, env (gen, ssh.gen) or files changed
-	return { ok: true, ssh_restarts: ssh_changed || new_gen };
+	return { ok: true, ssh_restarts: ssh_changed || new_gen, new_gen };
 }
 
 /* ---- converge -------------------------------------------------------------------------------- */
@@ -1101,12 +1101,53 @@ function rm_tree(dir) {
 	rmdir(dir);
 }
 
+// Settings → Logs (DESIGN.md 6.8): which instances a converge (re)starts and why at info, the rest at debug.
+// procd restarts xray when xray.json or the generation changed, ssh when its files or generations did.
+function report_converge(m, ctx, armed, chk, ap, prev, opts) {
+	let ssh_mode = (m.transport == 'ssh');
+	let what = ssh_mode ? sprintf('SSH server %s, %s', ctx.sel.name || ctx.sel.host, ctx.target.addr)
+		: sprintf('%s profile %s', uc(ctx.target.protocol ?? 'xray'), ctx.target.name);
+	let why = [];
+
+	if (!armed)
+		push(why, `starting: ${what}`);
+	else if (opts.connect || ap.new_gen)
+		push(why, `${opts.connect ? 'Connect' : 'new generation'}: xray${ssh_mode ? ' and ssh restart' : ' restarts'} (${what})`);
+	else if (prev.transport != null && prev.transport != m.transport)
+		push(why, `transport ${prev.transport} -> ${m.transport}: xray restarts, ssh ${ssh_mode ? 'starts' : 'stops'} (${what})`);
+	else {
+		if (chk.xray_changed)
+			push(why, `xray restarts: its configuration changed (${what})`);
+
+		if (ssh_mode && ap.ssh_restarts)
+			push(why, `ssh restarts: the server or its files changed (${what})`);
+	}
+
+	if (length(why))
+		state.log('info', `converge: ${join('; ', why)}`);
+
+	if (state.log_on('debug'))
+		state.log('debug', sprintf('converge: applied; nft table %s, dnsmasq %s, gate %s',
+			chk.recreate ? 'recreated' : 'updated',
+			access(`${R}/dnsmasq.restart`) ? 'restarts in post-start'
+				: (access(`${R}/dnsmasq.hup`) ? 'reloads in post-start' : 'unchanged'),
+			(ctx.gate == 'accept') ? 'open (direct)' : 'closed'));
+}
+
 function converge_once(opts) {
 	let c = cursor();
 	let model = config.load(c);
 	let m = model.main;
 
 	state.set_log_level(m.log_level);
+	// for the helpers that do not converge (state.load_log_level, the sh log functions); kept over a teardown,
+	// so a converge that turns Shadow on is logged at that level from its job's first line
+	state.ensure_run();
+
+	if (read_trim(`${R}/log_level`) != m.log_level)
+		put(`${R}/log_level`, `${m.log_level}\n`, 0o600);
+
+	state.log('debug', sprintf('converge: start%s%s', opts.connect ? ' (Connect)' : '', opts.boot ? ' (boot)' : ''));
 	report_rule_errors(model);
 
 	// autostart=0 means a reboot ends in a real Off, not an On with nothing running
@@ -1123,8 +1164,13 @@ function converge_once(opts) {
 	let armed = access(`${R}/active`) == true;
 
 	if (!m.enabled || !config.targets(model)) {
-		if (armed || armed_leftovers())
+		let removed = armed || armed_leftovers();
+
+		if (removed)
 			teardown(m.enabled);
+
+		state.log(removed ? 'info' : 'debug', sprintf('converge: %s%s', m.enabled ? 'nothing to route' : 'Shadow is off',
+			removed ? '; the data plane is removed' : ''));
 
 		// nothing of ours runs, so no lookup can bypass a tunnel
 		state.attention_clear('dns_upstream_leak');
@@ -1234,6 +1280,8 @@ function converge_once(opts) {
 		}
 	}
 
+	// the reason first, then the phase change it causes (state.write logs that)
+	report_converge(m, ctx, armed, chk, ap, prev, opts);
 	state.write(patch);
 
 	let gen = token();
@@ -1264,6 +1312,8 @@ function cmd_converge(opts) {
 
 		if (!access(`${R}/pending`))
 			break;
+
+		state.log('debug', 'converge: once more, a hook left pending meanwhile');
 	}
 
 	if (!opts.from_init)
@@ -1281,8 +1331,12 @@ function cmd_teardown(opts) {
 	if (!lk)
 		return 1;
 
+	let removed = armed_leftovers();
+
 	teardown();
 	lk.close();
+	state.log(removed ? 'info' : 'debug', sprintf('teardown: %s (service stop or restart, package removal)',
+		removed ? 'the data plane is removed' : 'nothing was armed'));
 
 	if (!opts.from_init)
 		declare();
@@ -1293,8 +1347,17 @@ function cmd_teardown(opts) {
 // Detached after a converge: DESIGN.md 6.3 step 6.
 function cmd_post_start(gen, opts) {
 	// dnsmasq restarts once xray listens; with the gate open its conf does not use xray
-	for (let i = 0; i < 20 && read_trim(`${R}/gate`) != 'accept' && !tcp_listening(C.PORT_TPROXY); i++)
+	let i = 0;
+
+	for (; i < 20 && read_trim(`${R}/gate`) != 'accept' && !tcp_listening(C.PORT_TPROXY); i++)
 		sleep(500);
+
+	if (read_trim(`${R}/gate`) == 'accept')
+		state.log('debug', 'post-start: the gate is open, so DNS does not wait for xray');
+	else if (tcp_listening(C.PORT_TPROXY))
+		state.log('debug', `post-start: xray listens (waited ${i * 500} ms)`);
+	else
+		state.log('info', 'post-start: xray does not listen after 10 s; going on without it');
 
 	let lk = lock(true);
 
@@ -1303,6 +1366,7 @@ function cmd_post_start(gen, opts) {
 
 	// a newer converge (or a teardown) took over and has its own post-start
 	if (!access(`${R}/active`) || read_trim(`${R}/applied`) != gen) {
+		state.log('debug', 'post-start: a newer converge or a teardown took over');
 		release(lk);
 		return 0;
 	}
@@ -1314,11 +1378,16 @@ function cmd_post_start(gen, opts) {
 		return 1;
 	}
 
-	for (let s in state.read_json(`${R}/flush.sets`) ?? [])
-		if (match(s, SET_NAME))
-			sh(`nft flush set ${TABLE} ${s}`);
+	let sets = state.read_json(`${R}/flush.sets`);
+	let flushed = filter((type(sets) == 'array') ? sets : [], (s) => match(s, SET_NAME));
+
+	for (let s in flushed)
+		sh(`nft flush set ${TABLE} ${s}`);
 
 	unlink(`${R}/flush.sets`);
+
+	if (length(flushed))
+		state.log('debug', `post-start: flushed the sets ${join(', ', flushed)}`);
 
 	if (access(`${R}/dnsmasq.restart`)) {
 		unlink(`${R}/dnsmasq.restart`);
@@ -1338,16 +1407,20 @@ function cmd_post_start(gen, opts) {
 
 			return 1;
 		}
+
+		state.log('debug', `post-start: dnsmasq instance ${info.name} restarted with Shadow's DNS file`);
 	}
 	else if (access(`${R}/dnsmasq.hup`)) {
 		unlink(`${R}/dnsmasq.hup`);
 		dnsmasq_hup(info.name);
+		state.log('debug', `post-start: dnsmasq instance ${info.name} reloaded (SIGHUP)`);
 	}
 
 	sh(`${C.LIBEXEC}/gate-set --locked`);
 	release(lk);
 
 	if (opts.check) {
+		state.log('debug', 'post-start: tunnel check in 2 s');
 		sleep(2000);
 		sh(`${C.LIBEXEC}/tunnel-check`);
 	}
@@ -1380,8 +1453,10 @@ function cmd_lan_check() {
 
 	let l = lan_info(cursor(), ubus_call('network.interface', 'dump'));
 
-	if (lan_state({ lan_ifs: l.ifs, local_nets: l.local_nets }) != readfile(`${R}/lan_state`))
+	if (lan_state({ lan_ifs: l.ifs, local_nets: l.local_nets }) != readfile(`${R}/lan_state`)) {
+		state.log('debug', 'lan-check: the LAN devices or networks changed; converging');
 		spawn_job('converge');
+	}
 
 	return 0;
 }
@@ -1411,6 +1486,9 @@ function cmd_state(phase, message, code) {
 
 let opts = parse_flags(slice(ARGV, 1));
 let rc = 2;
+
+// converge takes the level from the validated model again
+state.load_log_level();
 
 switch (ARGV[0]) {
 case 'converge':

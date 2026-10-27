@@ -114,7 +114,8 @@ function wan_up() {
 	let sid = trim(readfile(`${R}/ssh.sid`) ?? ''), restarted = false;
 
 	if (match(sid, SSH_SID)) {
-		let stale = ssh.session_stale(sid, link_age(sid));
+		let age = link_age(sid), up = ssh.session(sid).up;
+		let stale = ssh.session_stale(sid, age);
 
 		// the next attempt starts at once instead of waiting out the backoff
 		ssh.reset_backoff(sid);
@@ -125,6 +126,14 @@ function wan_up() {
 			u.call('service', 'signal', { name: 'shadow-vpn', instance: 'ssh', signal: 15 });
 			restarted = true;
 		}
+
+		if (restarted)
+			state.log('info', sprintf('wan-up: %s; restarting ssh now', !up ? 'no ssh session is up'
+				: (type(age) != 'int') ? 'the age of the link is not known' : 'the ssh session is older than the link'));
+		else if (stale)
+			state.log('warning', 'wan-up: ubus did not answer, so ssh was not restarted; only its backoff is reset');
+		else
+			state.log('debug', 'wan-up: the ssh session already runs over the new link; only its backoff is reset');
 	}
 
 	return { rc: run([ APPLY, 'converge' ]).rc, ssh_restarted: restarted };
@@ -132,7 +141,9 @@ function wan_up() {
 
 function execute(id, name, args) {
 	let argv = command(name, args);
-	let result;
+	let result, t0 = clock(true);
+
+	state.log('debug', sprintf('job %s: %s started', id, join(' ', [ name, ...args ])));
 
 	if (name == 'wan-up') {
 		result = wan_up();
@@ -177,6 +188,13 @@ function execute(id, name, args) {
 	}
 
 	state.job_write(id, { state: (result.rc == 0) ? 'done' : 'failed', result });
+
+	if (state.log_on('debug')) {
+		let t1 = clock(true);
+
+		state.log('debug', sprintf('job %s: %s %s in %.1f s (rc %d)', id, name, (result.rc == 0) ? 'done' : 'failed',
+			(t1[0] - t0[0]) + (t1[1] - t0[1]) / 1e9, result.rc));
+	}
 }
 
 function start(name, args) {
@@ -210,6 +228,7 @@ if (ARGV[0] == '--run') {
 	if (!state.valid_job_id(id) || command(ARGV[2], slice(ARGV, 3)) == null)
 		exit(2);
 
+	state.load_log_level();
 	execute(id, ARGV[2], slice(ARGV, 3));
 	exit(0);
 }

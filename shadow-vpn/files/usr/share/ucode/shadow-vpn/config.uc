@@ -18,7 +18,7 @@ const MAIN_ENUMS = {
 	transport: [ 'ssh', 'xray' ],
 	mode: [ 'proxy-all', 'selected-rules' ],
 	ssh_udp: [ 'reject', 'direct' ],
-	log_level: [ 'info', 'warning', 'error' ],
+	log_level: [ 'debug', 'info', 'warning', 'error' ],
 	update: [ 'manual', 'notify', 'auto' ]
 };
 

@@ -768,11 +768,14 @@ const DELETE = 'call service delete { "name": "shadow-vpn", "instance": ';
 
 connected_router();
 state.attention_add('update_available', 'Shadow 0.2.0 is available.');
+writefile(`${T}/run/xray.quick`, '0 100 0\n');
 r = update.install(opts({ limits: { settle: 30 } }));
 eq('update/settle: back and stable', r, { ok: true, changed: true, from: '0.1.5', to: '0.2.0' });
 eq('update/settle: procd kept the instances over the upgrade, so they are declared again and run the new code',
 	[ deletes(), lines(`${T}/init.log`), pids() ],
 	[ [ `${DELETE}"xray" }`, `${DELETE}"ssh" }` ], [ 'rpcd reload', 'shadow-vpn start' ], { xray: 102, ssh: 103 } ]);
+// a deliberate restart: the new xray-run must not log the old run as an exit (DESIGN.md 6.8)
+ok('update/settle: ...after removing xray.quick', !access(`${T}/run/xray.quick`));
 
 connected_router();
 writefile(`${T}/apk.restart`, '');

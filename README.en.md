@@ -101,7 +101,8 @@ profiles you keep and delete the rest with one button.
 
 ### Log
 
-Shadow, Xray and SSH events in one place: filter by level or text, download, follow.
+Shadow, Xray and SSH events in one place: filter by level or text, download, clear, follow. For debugging, set
+Settings → Logs → Detail to Debug, and back to Warnings and errors when you are done.
 
 ![The Logs tab](docs/images/en/log.png)
 

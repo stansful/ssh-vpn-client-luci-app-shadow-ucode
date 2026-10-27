@@ -10,6 +10,12 @@
 SHADOW_RUN=/var/run/shadow-vpn
 SHADOW_LOCK=/var/lock/shadow-vpn.lock
 
+# fw4 sources this file, so no plain names; "error" (Settings → Logs, the level the last converge left in RUN)
+# keeps errors only (DESIGN.md 6.8)
+shadow_warn() {
+	[ "$(cat "$SHADOW_RUN/log_level" 2>/dev/null)" = error ] || logger -t shadow-vpn -p daemon.warn "$*"
+}
+
 shadow_hup_dnsmasq() {
 	local inst confdir
 
@@ -94,7 +100,7 @@ shadow_heal() {
 	if ! shadow_table_ok && [ -s "$SHADOW_RUN/table.nft" ]; then
 		if nft -f "$SHADOW_RUN/table.nft"; then
 			shadow_ssh_addr
-			logger -t shadow-vpn -p daemon.warn "restored the nft table after a firewall flush"
+			shadow_warn "restored the nft table after a firewall flush"
 			shadow_hup_dnsmasq
 		fi
 	fi

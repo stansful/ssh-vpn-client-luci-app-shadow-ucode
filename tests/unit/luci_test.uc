@@ -22,7 +22,7 @@ const CONTRACT = [
 	'keys', 'key_save', 'key_delete', 'key_show', 'profiles', 'profiles_import', 'profile_rename', 'profile_pin',
 	'profile_delete', 'profiles_delete_unpinned', 'profile_link', 'lists', 'list_set', 'list_refresh', 'list_view',
 	'rules', 'rule_add', 'rule_set', 'rule_delete', 'rules_import', 'rules_export', 'leases', 'check', 'job_status',
-	'logs', 'attention_dismiss', 'update_status', 'update_check', 'update_install'
+	'logs', 'logs_clear', 'attention_dismiss', 'update_status', 'update_check', 'update_install'
 ];
 const IMPORTS = [ 'const', 'config', 'secrets', 'state', 'links', 'validate', 'lists', 'keys' ];
 
@@ -331,12 +331,17 @@ function run_tests(m) {
 	r = call('set_enabled', { enabled: true });
 	check('luci: turning on without a server is refused', r.error == 'Select or create an SSH configuration before connecting.' && uci_get('main', 'enabled') == '0');
 
+	unlink(RUN + '/log.txt');
 	call('select', { transport: 'xray', sid: pd.sid });
 	writefile(RUN + '/fatal', '1');
 	clear_jobs_log();
 	r = call('set_enabled', { enabled: true });
 	check('luci: turning on commits and starts a connecting converge',
 		r.job && uci_get('main', 'enabled') == '1' && trim(jobs_log()) == 'converge --connect', sprintf('%J %s', r, jobs_log()));
+	// what the user did goes to the log at info, under the level the settings hold (DESIGN.md 6.8)
+	check('luci: select and turning on are logged at info',
+		match(readfile(RUN + '/log.txt') ?? '', /^warning info luci: selected profile "[^"\n]*" \((p_[0-9a-f]{12})\), transport xray\nwarning info luci: turned on \(Connect\)\n$/)?.[1] == pd.sid,
+		readfile(RUN + '/log.txt'));
 
 	clear_jobs_log();
 	call('set_enabled', { enabled: true });

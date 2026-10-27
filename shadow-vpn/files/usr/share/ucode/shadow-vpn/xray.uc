@@ -4,7 +4,10 @@ import {
 	MARK_XRAY, PORT_TPROXY, PORT_DNS, PORT_SSH, PORT_CHECK, PORT_METRICS, OBSERVATORY, PRIVATE_NETS, DOH_SERVER
 } from 'shadow-vpn.const';
 
-const LOG_LEVELS = { info: 'info', warning: 'warning', error: 'error' };
+// Shadow's debug keeps xray at info: info already logs several lines per connection (the device's address,
+// the sniffed name), and xray's own debug adds far more, which would push Shadow's lines out of logd's ring
+// buffer within seconds (DESIGN.md 6.8).
+const LOG_LEVELS = { debug: 'info', info: 'info', warning: 'warning', error: 'error' };
 
 function clone(v) {
 	return json(sprintf('%J', v));

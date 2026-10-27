@@ -13,7 +13,7 @@
 		"write": {
 			"ubus": {
 				"luci.shadow-vpn": [
-					"set_enabled", "select", "settings_set", "check", "attention_dismiss",
+					"set_enabled", "select", "settings_set", "check", "attention_dismiss", "logs_clear",
 					"server_save", "server_delete", "hostkey_pin", "hostkey_forget",
 					"key_save", "key_delete", "key_show",
 					"profiles_import", "profile_rename", "profile_pin", "profile_delete", "profiles_delete_unpinned", "profile_link",

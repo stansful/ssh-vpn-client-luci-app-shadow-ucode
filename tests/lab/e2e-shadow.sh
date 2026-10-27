@@ -1302,7 +1302,7 @@ BOOT_MARK=/tmp/e2e-boot-done
 LAB_SECRETS="ssh.pw trojan.pw hy2.pw uuid"
 # every method of luci.shadow-vpn (CONTRACTS.md §9), sorted; stage3_luci calls each of them
 LUCI_METHODS="attention_dismiss check hostkey_forget hostkey_pin job_status key_delete key_save key_show keys leases list_refresh \
-list_set list_view lists logs profile_delete profile_link profile_pin profile_rename profiles profiles_delete_unpinned \
+list_set list_view lists logs logs_clear profile_delete profile_link profile_pin profile_rename profiles profiles_delete_unpinned \
 profiles_import rule_add rule_delete rule_set rules rules_export rules_import select server_delete server_save servers \
 set_enabled settings_set status update_check update_install update_status "
 
@@ -1577,7 +1577,7 @@ stage3_luci() {
 	poll 90 tunnel_up || { nok "luci: Shadow connected first" "$(rpc status | jq -c '{phase,message}')"; return; }
 
 	# the methods the router offers are exactly the ones this group calls (a new one cannot go untested)
-	check "rpc: the router offers the 38 methods tested here" "$LUCI_METHODS" \
+	check "rpc: the router offers the 39 methods tested here" "$LUCI_METHODS" \
 		"$(R 'ubus -v list luci.shadow-vpn' | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | LC_ALL=C sort | tr '\n' ' ')"
 
 	# status
@@ -1721,6 +1721,9 @@ $link2" '{text: $t, source: "manual"}')")"
 		[ -s "$STATE/$f" ] && printf '%s' "$out" | grep -qF -- "$(cat "$STATE/$f")" && r="$f"
 	done
 	if [ "$r" = ok ]; then ok "rpc logs: no lab secret in the lines"; else nok "rpc logs: no lab secret in the lines" "the secret from state/$r appears"; fi
+	check "rpc logs_clear: the mark is logged" "true" "$(rpc logs_clear | jq -r .ok)"
+	check "rpc logs: the lines start at the Clear mark" "luci: log view cleared" \
+		"$(rpc logs '{"lines":300}' | jq -r '.lines[0] // ""' | sed 's/^.* shadow-vpn: //')"
 	check "rpc attention_dismiss: a bad id is refused" "Invalid arguments." "$(rpc attention_dismiss '{"id":"../x"}' | jq -r .error)"
 	endpoint="$(main_opt check_endpoint)"
 	check "rpc settings_set: check endpoint and auto-refresh" "true" \

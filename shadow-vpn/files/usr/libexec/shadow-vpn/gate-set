@@ -12,6 +12,23 @@ LOCK=/var/lock/shadow-vpn.lock
 TABLE="inet shadow_vpn"
 FALLBACK_SEC=10
 
+# Settings → Logs as the last converge validated it (DESIGN.md 6.8); none yet counts as warning
+LOG_LEVEL=
+[ -s "$RUN/log_level" ] && read -r LOG_LEVEL < "$RUN/log_level"
+
+# log <err|warn|info|debug> <text>: Shadow's lines at that level, as state.log() does
+log() {
+	local prio="$1"
+	shift
+	case "$LOG_LEVEL" in
+		debug) ;;
+		info) [ "$prio" = debug ] && return 0 ;;
+		error) [ "$prio" = err ] || return 0 ;;
+		*) [ "$prio" = err ] || [ "$prio" = warn ] || return 0 ;;
+	esac
+	logger -t shadow-vpn -p "daemon.$prio" "$*"
+}
+
 verdict() {
 	[ "$1" = direct ] || return 0
 	[ "$2" = 1 ] && return 0
@@ -25,7 +42,7 @@ xray_listening() {
 }
 
 current_verdict() {
-	local fallback listening=0 down=0 fatal=0 up since
+	local fallback listening=0 down=0 fatal=0 up since v
 
 	fallback="$(cat "$RUN/fallback" 2>/dev/null)"
 	xray_listening && listening=1
@@ -35,7 +52,9 @@ current_verdict() {
 		read -r since < "$RUN/xray.down"
 		down=$(( ${up%.*} - ${since:-0} ))
 	fi
-	verdict "$fallback" "$listening" "$down" "$fatal"
+	v="$(verdict "$fallback" "$listening" "$down" "$fatal")"
+	log debug "tunnel gate: fallback ${fallback:-unknown}, xray listening $listening, down ${down} s, fatal $fatal: ${v:-closed}"
+	echo "$v"
 }
 
 same_file() {
@@ -67,7 +86,7 @@ apply_verdict() {
 			[ "$want" = accept ] && echo "add rule $TABLE gate accept"
 		} | nft -f - || return 1
 		echo "$want" > "$RUN/gate"
-		logger -t shadow-vpn -p daemon.warn "tunnel gate: ${want:-closed (reject while xray is down)}"
+		log warn "tunnel gate: ${want:-closed (reject while xray is down)}"
 	fi
 
 	# heals reload table.nft, so it always carries the current verdict
@@ -102,6 +121,7 @@ if ! flock -n 9; then
 	# never wait (ssh-up runs us synchronously); bother the lock holder only when the verdict changes:
 	# it converges again, which runs gate-set
 	[ "$(current_verdict)" = "$(cat "$RUN/gate" 2>/dev/null)" ] && exit 0
+	log debug "tunnel gate: the lock is busy; its holder converges again"
 	touch "$RUN/pending"
 	flock -n 9 || exit 0
 fi

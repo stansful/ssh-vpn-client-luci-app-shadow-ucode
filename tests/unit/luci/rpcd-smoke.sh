@@ -171,6 +171,17 @@ logger -t other-daemon 'smoke: must not show up'
 out=$(call logs '{"lines":50}')
 echo "$out" | grep -q 'smoke: password=<redacted> vless://<redacted>@nl.example.net' && pass 'logs redacts secrets' || fail 'logs redacts secrets' "$out"
 echo "$out" | grep -q other-daemon && fail 'logs keeps only Shadow tags' "$out" || pass 'logs keeps only Shadow tags'
+expect logs_clear '' '@.ok' 'clears the log view'
+logger -t shadow-vpn 'smoke: after the clear'
+out=$(call logs '{"lines":50}')
+echo "$out" | grep -q 'smoke: password' && fail 'logs starts at the clear mark' "$out" || pass 'logs starts at the clear mark'
+echo "$out" | grep -q 'luci: log view cleared' && echo "$out" | grep -q 'smoke: after the clear' &&
+	pass 'logs shows the mark and what came after it' || fail 'logs shows the mark and what came after it' "$out"
+# a profile name from a link can end a converge line with the mark's text: only the whole message counts
+logger -t shadow-vpn -p daemon.info 'converge: starting: VLESS profile x: luci: log view cleared'
+out=$(call logs '{"lines":50}')
+echo "$out" | grep -q 'smoke: after the clear' && pass 'logs ignores a line that only ends with the mark' ||
+	fail 'logs ignores a line that only ends with the mark' "$out"
 expect attention_dismiss '{"id":"none-such"}' '@.ok' 'accepts an unknown id'
 expect job_status '{"id":"../x"}' '@.error' 'refuses a bad job id'
 

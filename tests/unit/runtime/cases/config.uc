@@ -17,7 +17,7 @@ eq('config/good: main', m.main, {
 	enabled: true, autostart: false, transport: 'xray', ssh_server: 's_0123456789ab', xray_profile: 'p_0123456789ab',
 	mode: 'selected-rules', kill_switch: false, check_endpoint: 'example.com:8443', check_after_connect: false,
 	ssh_udp: 'direct', tunnel_dns: false, ipv6: true, dns_redirect: false, router_traffic: false,
-	lists_refresh: 12, log_level: 'info', update: 'auto'
+	lists_refresh: 12, log_level: 'debug', update: 'auto'
 });
 eq('config/good: lists', m.lists, { proxy: { enabled: true }, direct: { enabled: false } });
 eq('config/good: no errors', m.errors, []);

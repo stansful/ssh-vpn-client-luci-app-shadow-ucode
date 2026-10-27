@@ -8,7 +8,7 @@ import { cursor } from 'uci';
 import { connect } from 'ubus';
 import * as socket from 'socket';
 
-import { UCI, ETC, RUN, LIBEXEC, PORT_METRICS, LIMITS } from 'shadow-vpn.const';
+import { UCI, ETC, RUN, LIBEXEC, PORT_METRICS, LIMITS, APK_DB, UPDATE } from 'shadow-vpn.const';
 import * as config from 'shadow-vpn.config';
 import * as secrets from 'shadow-vpn.secrets';
 import * as state from 'shadow-vpn.state';
@@ -27,11 +27,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const FP_RE = /^SHA256:[A-Za-z0-9+\/]{43}$/;
 const MAC_RE = /^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$/;
 const LIST_KINDS = [ 'proxy', 'direct' ];
-const JOBS = { converge: [ '--connect' ], check: [], 'list-refresh': LIST_KINDS };
+const JOBS = { converge: [ '--connect' ], check: [], 'list-refresh': LIST_KINDS, 'update-check': [], 'update-install': [] };
 const LOG_TAGS = [ 'shadow-vpn', 'xray', 'xray-run', 'ssh', 'ssh-run', 'ssh-openssh' ];
 const LOG_RE = /^\S+ \S+ +[0-9]+ [0-9:]+ [0-9]+ [a-z0-9]+\.[a-z]+ ([^:\[ ]+)(\[[0-9]+\])?: /;
 const MAX_IMPORT_ERRORS = 500;
 const UNSUPPORTED_PROFILE = "This profile uses an unsupported security mode or transport, so it can't be selected.";
+const UPDATE_RUNNING = 'An update is already running.';
+const UPDATER = '/usr/libexec/shadow-vpn/update';
+const VERSION_RE = /^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-r[0-9]+)?$/;
 
 const RULE_CHECK = {
 	domain: validate.domain_rule,
@@ -388,15 +391,14 @@ function routing(model) {
 }
 
 function versions() {
-	const path = '/lib/apk/db/installed';
-	const st = stat(path);
+	const st = stat(APK_DB);
 
 	if (version_cache && version_cache.mtime == st?.mtime)
 		return version_cache.versions;
 
 	const wanted = { 'shadow-vpn': 'shadow', 'xray-core': 'xray', 'openssh-client': 'openssh' };
 	const found = { shadow: null, xray: null, openssh: null };
-	const f = open(path, 'r');
+	const f = open(APK_DB, 'r');
 	let pkg = null;
 
 	if (f) {
@@ -452,13 +454,18 @@ function status_model() {
 	return model_cache.model;
 }
 
-// Durations are worked out here, on one clock: `since` comes from the router's clock, which can be days
-// off until NTP sets it after a power cut (no battery clock), and the browser's clock is another one.
-function age_of(st) {
-	if (type(st?.since_up) == 'int')
-		return max(0, state.uptime() - st.since_up);
+// Durations are worked out here, on one clock: an epoch stamp comes from the router's clock, which can be
+// days off until NTP sets it after a power cut (no battery clock), and the browser's clock is another one.
+// A stamp's uptime twin (`*_up`) is used when the writer left one.
+function stamp_age(up, at) {
+	if (type(up) == 'int')
+		return max(0, state.uptime() - up);
 
-	return (type(st?.since) == 'int' && st.since > 0) ? max(0, time() - st.since) : null;
+	return (type(at) == 'int' && at > 0) ? max(0, time() - at) : null;
+}
+
+function age_of(st) {
+	return stamp_age(st?.since_up, st?.since);
 }
 
 function status() {
@@ -1522,6 +1529,148 @@ function settings_set(req) {
 }
 
 
+/* Updates (DESIGN §11) */
+
+// The updater's files are only read here: update.uc is not imported, so neither a check nor an install ever
+// runs inside rpcd (both are jobs). Fields of older or newer writers are tolerated.
+
+// [x, y, z] of 'X.Y.Z', 'vX.Y.Z' or an apk 'X.Y.Z-rN' (no leading zeros, as scripts/lib/version.sh); null otherwise.
+function version_parts(v) {
+	const m = (type(v) == 'string') ? match(v, VERSION_RE) : null;
+
+	return m ? [ +m[1], +m[2], +m[3] ] : null;
+}
+
+// -1, 0 or 1; null when either is not a version.
+function version_compare(a, b) {
+	const x = version_parts(a), y = version_parts(b);
+
+	if (!x || !y)
+		return null;
+
+	for (let i = 0; i < 3; i++)
+		if (x[i] != y[i])
+			return (x[i] > y[i]) ? 1 : -1;
+
+	return 0;
+}
+
+function text_or_null(v) {
+	return (type(v) == 'string' && v != '') ? v : null;
+}
+
+function installed_version() {
+	const p = version_parts(versions().shadow);
+
+	return p ? join('.', p) : null;
+}
+
+// A pid in UPDATE.run counts only while its command line still names the updater: the file of an install
+// killed before it could remove it, or its pid taken by another process, is no running update.
+function update_running() {
+	const run = read_json(UPDATE.run);
+	const pid = run?.pid;
+	const cmdline = (type(pid) == 'int' && pid > 0) ? readfile(`/proc/${pid}/cmdline`) : null;
+
+	if (!cmdline || index(cmdline, UPDATER) < 0)
+		return null;
+
+	return {
+		stage: text_or_null(run.stage),
+		version: text_or_null(run.version),
+		auto: run.auto === true,
+		age: stamp_age(run.started_up, run.started)
+	};
+}
+
+function update_last(last) {
+	if (type(last) != 'object')
+		return null;
+
+	return {
+		ok: last.ok === true,
+		changed: last.changed === true,
+		from: text_or_null(last.from),
+		to: text_or_null(last.to),
+		error: text_or_null(last.error),
+		auto: last.auto === true,
+		rolled_back: last.rolled_back === true,
+		age: stamp_age(last.at_up, last.at)
+	};
+}
+
+// The last automatic attempt (flash); `stopped` once it failed max_tries times for its version.
+function update_auto() {
+	const a = read_json(UPDATE.auto);
+
+	if (type(a) != 'object' || !version_parts(a.version))
+		return null;
+
+	const tries = (type(a.tries) == 'int') ? a.tries : 0;
+
+	return {
+		version: a.version,
+		tries,
+		ok: a.ok === true,
+		finished: a.finished === true,
+		error: text_or_null(a.error),
+		stopped: tries >= UPDATE.max_tries && a.ok !== true
+	};
+}
+
+// Automatic installs start in a window of the router's local hours, which the page shows with this clock.
+function router_clock() {
+	const ctx = cursor();
+	const lt = localtime();
+
+	return {
+		time: sprintf('%02d:%02d', lt.hour, lt.min),
+		zone: text_or_null(ctx.get_first('system', 'system', 'zonename')) ??
+			text_or_null(ctx.get_first('system', 'system', 'timezone')) ?? 'UTC'
+	};
+}
+
+function update_status() {
+	// the run file first: the updater writes its result into UPDATE.state before it removes the run file, so an
+	// answer without a running install always carries that result (LuCI stops polling on it)
+	const running = update_running();
+	const raw = read_json(UPDATE.state);
+	const s = (type(raw) == 'object') ? raw : {};
+	const installed = installed_version();
+	const lp = version_parts(s.latest);
+	const latest = lp ? join('.', lp) : null;
+	const url = text_or_null(s.url);
+
+	return {
+		mode: status_model().main.update ?? 'notify',
+		installed,
+		latest,
+		available: version_compare(latest, installed) == 1,
+		console: s.console === true,
+		// the page puts it into a link: only a web address
+		url: (url && match(url, /^https?:\/\//)) ? url : null,
+		published: (type(s.published) == 'int') ? s.published : null,
+		notes: text_or_null(s.notes),
+		checked_age: stamp_age(s.checked_up, s.checked),
+		check_ok: (type(s.ok) == 'bool') ? s.ok : null,
+		check_error: text_or_null(s.error),
+		running,
+		last: update_last(s.last),
+		auto: update_auto(),
+		clock: router_clock()
+	};
+}
+
+// The updater takes its own lock and answers a busy one too; this refusal only saves a job that would fail.
+function update_check() {
+	return update_running() ? { error: UPDATE_RUNNING } : spawn_job('update-check');
+}
+
+function update_install() {
+	return update_running() ? { error: UPDATE_RUNNING } : spawn_job('update-install');
+}
+
+
 function method(args, fn) {
 	return {
 		args,
@@ -1585,6 +1734,10 @@ return {
 		job_status: method({ id: 'id' }, job_status),
 		logs: method({ lines: 300 }, logs),
 		attention_dismiss: method({ id: 'id' }, attention_dismiss),
-		settings_set: method({ values: {} }, settings_set)
+		settings_set: method({ values: {} }, settings_set),
+
+		update_status: method({}, update_status),
+		update_check: method({}, update_check),
+		update_install: method({}, update_install)
 	}
 };

@@ -126,7 +126,10 @@ const api = {
 	check: declare('check'),
 	jobStatus: declare('job_status', [ 'id' ]),
 	logs: declare('logs', [ 'lines' ]),
-	attentionDismiss: declare('attention_dismiss', [ 'id' ])
+	attentionDismiss: declare('attention_dismiss', [ 'id' ]),
+	updateStatus: declare('update_status'),
+	updateCheck: declare('update_check'),
+	updateInstall: declare('update_install')
 };
 
 /*
@@ -213,6 +216,32 @@ const PATTERNS = [
 	[ /^Upstream SOCKS5 proxy refused (\S+) with code (\d+)\.$/, 'Upstream SOCKS5 proxy refused %s with code %s.' ],
 	[ /^The tunnel opened a connection to (\S+) but nothing came back within \d+ ?s\. Traffic is entering the tunnel and not reaching the server\.$/,
 		'The tunnel opened a connection to %s but nothing came back within 12 s. Traffic is entering the tunnel and not reaching the server.' ],
+	// first: the hint ends another message, which is translated on its own
+	[ /^(.+) The tunnel is down, and Shadow’s kill switch may be what blocks the download\.$/,
+		'%s The tunnel is down, and Shadow’s kill switch may be what blocks the download.', [ 0 ] ],
+	[ /^Not enough space on the router: (\d+) MB free, (\d+) MB needed\.$/, 'Not enough space on the router: %s MB free, %s MB needed.' ],
+	[ /^Not enough free memory: (\d+) MB available, (\d+) MB needed\.$/, 'Not enough free memory: %s MB available, %s MB needed.' ],
+	[ /^Could not download (.+) from GitHub\.$/, 'Could not download %s from GitHub.' ],
+	[ /^The latest release has no (\S+)\.$/, 'The latest release has no %s.' ],
+	[ /^SHA256SUMS has no entry for (\S+)\.$/, 'SHA256SUMS has no entry for %s.' ],
+	[ /^The checksum of (.+) does not match SHA256SUMS: the file is damaged or was replaced\.$/,
+		'The checksum of %s does not match SHA256SUMS: the file is damaged or was replaced.' ],
+	[ /^The size of (.+) does not match the release\.$/, 'The size of %s does not match the release.' ],
+	[ /^GitHub lists another checksum for (.+) than SHA256SUMS\.$/, 'GitHub lists another checksum for %s than SHA256SUMS.' ],
+	[ /^Shadow (\S+) must be installed with the install command from the console\.$/, 'Shadow %s must be installed with the install command from the console.' ],
+	[ /^The package manager could not install the update: (.*)$/, 'The package manager could not install the update: %s' ],
+	[ /^The package manager did not install Shadow (\S+)\.$/, 'The package manager did not install Shadow %s.' ],
+	[ /^Shadow (\S+) was installed, but the tunnel did not come back within (\d+) s\.$/,
+		'Shadow %s was installed, but the tunnel did not come back within %s s.' ],
+	[ /^Shadow (\S+) was installed, but the tunnel did not come back, so Shadow (\S+) was put back\.$/,
+		'Shadow %s was installed, but the tunnel did not come back, so Shadow %s was put back.' ],
+	[ /^Shadow (\S+) was installed, but the tunnel did not come back, and putting Shadow (\S+) back failed: (.*)$/,
+		'Shadow %s was installed, but the tunnel did not come back, and putting Shadow %s back failed: %s', [ 2 ] ],
+	[ /^The packages of the installed Shadow (\S+) could not be downloaded for a rollback, so it was not updated automatically\.$/,
+		'The packages of the installed Shadow %s could not be downloaded for a rollback, so it was not updated automatically.' ],
+	[ /^Shadow (\S+) is available\.$/, 'Shadow %s is available.' ],
+	[ /^The automatic update to (\S+) failed: (.*)$/, 'The automatic update to %s failed: %s', [ 1 ] ],
+	[ /^The automatic update to (\S+) was interrupted\.$/, 'The automatic update to %s was interrupted.' ],
 	[ /^Connected to (.+)\.$/, 'Connected to %s.' ]
 ];
 

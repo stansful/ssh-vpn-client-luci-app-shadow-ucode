@@ -27,7 +27,8 @@ function load(ctx) {
 			mode: (m.mode == 'selected-rules') ? 'selected-rules' : 'proxy-all',
 			check_endpoint: m.check_endpoint ?? 'youtube.com:443',
 			ssh_udp: (m.ssh_udp == 'direct') ? 'direct' : 'reject',
-			lists_refresh: int(m.lists_refresh ?? 24), log_level: m.log_level ?? 'warning'
+			lists_refresh: int(m.lists_refresh ?? 24), log_level: m.log_level ?? 'warning',
+			update: (m.update in [ 'manual', 'notify', 'auto' ]) ? m.update : 'notify'
 		},
 		lists: {
 			proxy: { enabled: flag(ctx.get(UCI, 'proxy', 'enabled'), false) },

@@ -107,8 +107,21 @@ Shadow, Xray and SSH events in one place: filter by level or text, download, fol
 
 ## Update
 
-Run the same command as for the install. If Shadow was on, it stays on. LuCI shows the command too:
-Services → Shadow → Settings → About.
+Shadow updates right from LuCI: Services → Shadow → Settings → Updates shows the installed and the latest
+version, with the "Check now" and "Update to …" buttons. If Shadow was on, it stays on.
+
+Choose how it updates in the same place:
+
+- **"Check daily and show a notice"** (the default). Once a day the router asks GitHub which release is the
+  latest, and when there is a new version, the Overview shows a notice.
+- **"Install automatically at night".** A new version installs itself between 03:00 and 06:00 router time. The
+  files come only from the project's releases on GitHub and are checked against their checksums. The tunnel
+  restarts for a few seconds; if it does not come back after the update, Shadow puts the previous version back.
+- **"Only when I check".** The router asks GitHub only when you press "Check now".
+
+The install command still updates Shadow too, including versions without the Updates section. LuCI shows it as
+well: Services → Shadow → Settings → About. While an update from LuCI or at night is running, the command says so
+and stops: run it again in a few minutes.
 
 <details>
 <summary>If the command ends with a wget error</summary>

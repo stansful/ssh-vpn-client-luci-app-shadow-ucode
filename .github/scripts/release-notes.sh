@@ -3,6 +3,10 @@
 # subjects since the previous release tag (the highest X.Y.Z or vX.Y.Z tag in the history of $GITHUB_SHA other
 # than $VERSION), newest first, without merges and without the release commits of scripts/make-release.sh.
 #
+# A release that the updaters on the routers must not install (DESIGN.md 11.1) ends with the line
+# `shadow-update: console`: when build/CONSOLE_UPDATE holds this very version (a file left over from an earlier
+# release marks nothing).
+#
 # Env: GH_REPO or GITHUB_REPOSITORY (owner/repo), GITHUB_SHA (default HEAD), VERSION (default: build/VERSION).
 # Reads the tags and the history of this checkout (release.yml fetches them all).
 set -euo pipefail
@@ -40,3 +44,18 @@ sh <(wget -O - https://raw.githubusercontent.com/$repo/HEAD/install.sh)
 
 ${changes:-- только новая версия / version bump only}
 EOF
+
+# The marker goes into the notes the release is created with: release.yml publishes the draft right after the
+# uploads, and an edit after that would come when routers may have seen the release as the latest already.
+console=
+if [ -f "$ROOT/build/CONSOLE_UPDATE" ]; then
+	console="$(tr -d ' \t\r\n' <"$ROOT/build/CONSOLE_UPDATE")"
+fi
+if [ "$console" = "$VERSION" ]; then
+	cat <<EOF
+
+Эту версию обновление из LuCI не устанавливает: установите её командой выше. / Updates from LuCI do not install this version: install it with the command above.
+
+shadow-update: console
+EOF
+fi

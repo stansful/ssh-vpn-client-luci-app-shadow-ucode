@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Static checks that the release pieces agree (DESIGN.md 11): the files release.yml publishes are the files
-# scripts/build-release.sh builds, they include everything install.sh downloads, the release is tagged plain
-# X.Y.Z, the tag's commit is read one way (tag_commit), both workflows build and test the way the docs say, and no
-# shell variable runs into « or » (macOS's bash 3.2).
+# scripts/build-release.sh builds, they include everything install.sh downloads and the files the router's updater
+# requires, the release is tagged plain X.Y.Z, the tag's commit is read one way (tag_commit), both workflows build and
+# test the way the docs say, and no shell variable runs into « or » (macOS's bash 3.2).
 #
 #   tests/unit/release/assets_test.sh
 #
@@ -48,6 +48,22 @@ else
 	nok "every file install.sh downloads is published" "not published:${missing:- (install.sh lists no files?)}"
 fi
 
+# The updater on the router (update.uc) asks every release for these two by name, and an installed updater of
+# any older version keeps asking for them (DESIGN.md 11)
+UPDATER="$TREE/shadow-vpn/files/usr/share/ucode/shadow-vpn/update.uc"
+needed="SHA256SUMS shadow-vpn.apk"
+missing=
+unnamed=
+for f in $needed; do
+	case " $workflow_assets " in *" $f "*) ;; *) missing="$missing $f" ;; esac
+	grep -qF "$f" "$UPDATER" 2>/dev/null || unnamed="$unnamed $f"
+done
+if [ -n "$workflow_assets" ] && [ -z "$missing$unnamed" ]; then
+	ok "the files the updater requires are published ($needed)"
+else
+	nok "the files the updater requires are published" "not published:${missing:- none}, not named in update.uc:${unnamed:- none}"
+fi
+
 case " $summed " in
 *" install.sh "*) ok "SHA256SUMS covers install.sh too" ;;
 *) nok "SHA256SUMS covers install.sh too" "SUMMED='$summed'" ;;
@@ -90,6 +106,14 @@ if grep -qF 'id=$(gh api -X POST "repos/$GH_REPO/releases"' "$RELEASE" && grep -
 	ok "publish works with the id the API returns for the new draft, not a lookup in the release list"
 else
 	nok "publish works with the id the API returns for the new draft" "release.yml creates or finds the draft another way"
+fi
+
+# The notes get the console marker from build/CONSOLE_UPDATE (DESIGN.md 11.1): the sparse checkout of the job that
+# writes them must bring that file along, or a marked release would be published without its marker
+if grep -q '^            /build/CONSOLE_UPDATE$' "$RELEASE" && grep -qF 'bash .github/scripts/release-notes.sh >' "$RELEASE"; then
+	ok "the job that writes the release notes checks out build/CONSOLE_UPDATE"
+else
+	nok "the job that writes the release notes checks out build/CONSOLE_UPDATE" "release-notes.sh would never see the marker file"
 fi
 
 # A push to master starts release.yml only (which calls ci.yml): no second, skipped CI run for the same push

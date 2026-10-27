@@ -316,17 +316,19 @@ function metrics_vars(timeout_ms) {
 
 // Tunnel health as xray's own observatory sees it (DESIGN.md 6.6): alive is null while xray is not
 // answering or has not probed yet; fallback is what the balancer uses while the tunnel is dead.
+// answered and probed tell those two apart: the updater counts a silent xray as down but waits for a probe.
 function tunnel_health(timeout_ms) {
 	let fallback = trim(readfile(`${RUN}/fallback`) ?? '') || null;
-	let proxy = metrics_vars(timeout_ms ?? 800)?.observatory?.proxy;
+	let vars = metrics_vars(timeout_ms ?? 800);
+	let proxy = vars?.observatory?.proxy;
 
 	if (type(proxy) != 'object')
-		return { alive: null, fallback, delay_ms: null };
+		return { alive: null, fallback, delay_ms: null, answered: vars != null, probed: false };
 
 	// protobuf JSON omits false and zero values
 	let alive = proxy.alive === true;
 
-	return { alive, fallback, delay_ms: (alive && proxy.delay != null) ? int(proxy.delay) : null };
+	return { alive, fallback, delay_ms: (alive && proxy.delay != null) ? int(proxy.delay) : null, answered: true, probed: true };
 }
 
 export {

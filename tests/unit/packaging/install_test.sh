@@ -7,8 +7,9 @@
 # Builds the packages from the current tree; files other areas have not written yet are filled in
 # from stubs/ (each one is listed). Serves the build from a throwaway web container and runs
 # install.sh with SHADOW_BASE_URL. At the end this install.sh installs the latest release published on
-# GitHub, or says that none is published yet (PUBLISHED_RELEASE=skip skips that part: release.yml sets it only
-# in a run that publishes a new version; every other run checks the published release).
+# GitHub, or says that none is published yet, and so does the updater of this tree's build, which also downloads
+# that release through both of its paths and is installed over it (PUBLISHED_RELEASE=skip skips that part:
+# release.yml sets it only in a run that publishes a new version; every other run checks the published release).
 # Needs the lab images (BUILD_ONLY=1 tests/lab/up.sh), Docker and Internet access for the official
 # package feed and GitHub. Its containers and network are named
 # shv-packaging-* and removed on exit (KEEP=1 keeps them and the work dir for debugging).
@@ -27,6 +28,9 @@ WEB_IP=198.51.100.10
 BASE="http://$WEB_IP"
 EPOCH=1792886400
 CRON_CMD='/usr/libexec/shadow-vpn/lists refresh due'
+UPDATER=/usr/libexec/shadow-vpn/update
+UPDATE_CMD="$UPDATER due"
+UPDATE_LOCK=/var/lock/shadow-vpn-update.lock
 # shellcheck source=../../lab/lib/host.sh
 . "$TREE/tests/lab/lib/host.sh"
 
@@ -165,7 +169,10 @@ for name in ("admin", "services", "shadow-vpn"):
     node = node.get("children", {}).get(name, {})
 sys.exit(0 if node.get("title") == "Shadow" else 1)' "$WORK/menu.json" 2>/dev/null
 }
-cron_lines() { r "crontab -c /etc/crontabs -l 2>/dev/null | grep -cF '$CRON_CMD'"; }
+# cron_lines [command]: how many crontab lines run it (default: the lists refresh)
+cron_lines() { r "crontab -c /etc/crontabs -l 2>/dev/null | grep -cF '${1:-$CRON_CMD}'"; }
+# "<lists lines> <update lines>": "1 1" while Shadow is installed, "0 0" once it is removed
+cron_both() { echo "$(cron_lines) $(cron_lines "$UPDATE_CMD")"; }
 
 # --- refusals: nothing may be touched
 expect "install.sh passes busybox ash -n" "syntax error" r 'sh -n /tmp/install.sh'
@@ -238,8 +245,10 @@ expect "packaged files are root-owned and not world-writable" "bad owner or mode
 	done < /lib/apk/packages/$p.list; done'
 expect "helpers are executable" "not executable" \
 	r 'for f in $(grep "^/usr/libexec/shadow-vpn/\|^/etc/init.d/" /lib/apk/packages/shadow-vpn.list); do [ -x "$f" ] || exit 1; done'
-expect "cron line installed once and cron running" "lines=$(cron_lines)" \
-	sh -c "[ '$(cron_lines)' = 1 ] && docker exec $ROUTER pidof crond"
+expect "both cron lines installed once and cron running" "lines=$(cron_both)" \
+	sh -c "[ '$(cron_both)' = '1 1' ] && docker exec $ROUTER pidof crond"
+expect "the update line runs 'update due' hourly at :47" "$(r 'crontab -c /etc/crontabs -l' | tr '\n' '|')" \
+	r "crontab -c /etc/crontabs -l | grep -qxF '47 * * * * $UPDATE_CMD >/dev/null 2>&1'"
 expect "LuCI menu has Services -> Shadow" "no shadow-vpn entry in admin/menu" menu_has_shadow
 expect "ru language registered" "luci.languages.ru missing" r '[ "$(uci -q get luci.languages.ru)" = "Русский (Russian)" ]'
 if [ -n "$TR_ID" ]; then
@@ -249,8 +258,8 @@ fi
 
 run_install "$WORK/again.log" "$BASE/v1"
 rc=$?
-expect "running it again is harmless" "rc=$rc: $(tail -n 3 "$WORK/again.log")" \
-	sh -c "[ $rc = 0 ] && [ '$(cron_lines)' = 1 ] && grep -q 'is already installed and is off' '$WORK/again.log'"
+expect "running it again is harmless (one of each cron line)" "rc=$rc, lines=$(cron_both): $(tail -n 3 "$WORK/again.log")" \
+	sh -c "[ $rc = 0 ] && [ '$(cron_both)' = '1 1' ] && grep -q 'is already installed and is off' '$WORK/again.log'"
 
 # --- Shadow on with the kill switch and its tunnel down (here: no xray answers on 127.0.0.1:12348): in full mode the
 # router cannot download, so install.sh stops before it touches anything and says how to go on
@@ -284,14 +293,15 @@ expect "apk del: DNS still works" "no answer" r 'pidof dnsmasq && nslookup openw
 expect "apk del: /etc/config/dhcp kept" "changed" test "$(r 'sha256sum /etc/config/dhcp')" = "$DHCP_SUM"
 expect "apk del: Shadow is recorded off (a later install starts off)" "enabled=$(r 'uci -q get shadow-vpn.main.enabled')" \
 	r '[ "$(uci -q get shadow-vpn.main.enabled)" = 0 ]'
-expect "apk del: cron line and fw4 include removed" "lines=$(cron_lines)" \
-	sh -c "[ '$(cron_lines)' = 0 ] && ! docker exec $ROUTER uci -q get firewall.shadow_vpn"
+expect "apk del: both cron lines and the fw4 include removed" "lines=$(cron_both)" \
+	sh -c "[ '$(cron_both)' = '0 0' ] && ! docker exec $ROUTER uci -q get firewall.shadow_vpn"
 if menu_has_shadow; then nok "apk del: LuCI menu entry gone" "still in admin/menu"; else ok "apk del: LuCI menu entry gone"; fi
 
 run_install "$WORK/reinstall.log" "$BASE/v1"
 rc=$?
 expect "install.sh after apk del installs 0.1.0 again, off" "rc=$rc: $(tail -n 3 "$WORK/reinstall.log")" \
 	sh -c "[ $rc = 0 ] && grep -q 'Shadow 0.1.0-r1 is installed and is off' '$WORK/reinstall.log'"
+expect "...with one of each cron line again" "lines=$(cron_both)" test "$(cron_both)" = "1 1"
 
 # --- a new latest release published while install.sh downloads: old sums with a new package. install.sh pauses
 # and fetches everything again; the release is consistent again meanwhile.
@@ -308,8 +318,10 @@ wait "$flux_pid"
 expect "a new latest release during the download: fetched again, then installed" "$(tail -n 4 "$WORK/flux.log" | tr '\n' ' ')" \
 	sh -c "[ $seen = 1 ] && grep -qx 'rc=0' '$WORK/flux.log' && grep -q 'Shadow 0.1.0-r1 is already installed' '$WORK/flux.log'"
 
-# --- upgrade keeps Shadow on
+# --- upgrade keeps Shadow on. The router is made to look like one with a build from before the updater: only the
+# lists cron line (the upgrade from the published release below checks the same while that release has no updater).
 r 'uci set shadow-vpn.main.enabled=1 && uci commit shadow-vpn'
+r "crontab -c /etc/crontabs -l | grep -vF '$UPDATE_CMD' | crontab -c /etc/crontabs -"
 run_install "$WORK/upgrade.log" "$BASE/v2"
 rc=$?
 if [ "$rc" = 0 ]; then ok "upgrades to 0.1.1"; else nok "upgrades to 0.1.1" "rc=$rc: $(tail -n 5 "$WORK/upgrade.log")"; fi
@@ -317,7 +329,23 @@ expect "upgrade installed 0.1.1-r1" "$(r 'apk list -I shadow-vpn 2>/dev/null')" 
 	r 'apk list -I shadow-vpn 2>/dev/null | grep -q "^shadow-vpn-0.1.1-r1 "'
 expect "upgrade keeps Shadow on" "enabled=$(r 'uci -q get shadow-vpn.main.enabled')" \
 	sh -c "[ \"\$(docker exec $ROUTER uci -q get shadow-vpn.main.enabled)\" = 1 ] && grep -q 'upgraded to 0.1.1-r1 and is on' '$WORK/upgrade.log'"
-expect "upgrade keeps one cron line" "lines=$(cron_lines)" test "$(cron_lines)" = 1
+expect "upgrade keeps the lists line and adds the update line (one of each)" "lines=$(cron_both)" test "$(cron_both)" = "1 1"
+# the package scripts started detached jobs (busybox start-stop-daemon -b keeps descriptors above 2): none got the lock
+expect "the upgrade leaves the update lock free" "held after install.sh" r "flock -n $UPDATE_LOCK true"
+
+# --- an update from LuCI or at night holds the updater's lock: install.sh does not run in the middle of it
+r "mkdir -p /var/lock && rm -f /tmp/holder.pid"
+docker exec -d "$ROUTER" sh -c "exec 9>>$UPDATE_LOCK && flock 9 && echo \$\$ > /tmp/holder.pid && exec sleep 120"
+for _ in $(seq 1 50); do r '[ -s /tmp/holder.pid ]' && break; sleep 0.2; done
+run_install "$WORK/locked.log" "$BASE/v2"
+rc=$?
+expect "refuses while an update runs, in Russian and English" "rc=$rc: $(tail -n 3 "$WORK/locked.log")" \
+	sh -c "[ $rc -ne 0 ] && grep -q 'Shadow is being updated right now' '$WORK/locked.log' && grep -q 'Shadow сейчас обновляется' '$WORK/locked.log'"
+run_install "$WORK/locked-uninstall.log" "$BASE/v2" --uninstall
+rc=$?
+expect "--uninstall refuses too, and removes nothing" "rc=$rc: $(tail -n 3 "$WORK/locked-uninstall.log")" \
+	sh -c "[ $rc -ne 0 ] && grep -q 'Shadow is being updated right now' '$WORK/locked-uninstall.log' && docker exec $ROUTER apk info -e shadow-vpn >/dev/null"
+r 'kill "$(cat /tmp/holder.pid)"; rm -f /tmp/holder.pid'
 
 # --- the release moved back to an older version (a rollback): said so, not "upgraded"
 run_install "$WORK/downgrade.log" "$BASE/v1"
@@ -340,7 +368,7 @@ expect "our packages are gone" "still installed" \
 expect "dnsmasq-full stays, in the world" "dnsmasq-full removed" r 'apk info -e dnsmasq-full && grep -qx dnsmasq-full /etc/apk/world'
 expect "DNS still works after uninstall" "no answer" r 'pidof dnsmasq && nslookup openwrt.org 127.0.0.1'
 expect "orphaned xray-core removed" "xray-core still installed" r '! apk info -e xray-core'
-expect "cron line removed" "lines=$(cron_lines)" test "$(cron_lines)" = 0
+expect "both cron lines removed" "lines=$(cron_both)" test "$(cron_both)" = "0 0"
 expect "Shadow is off and its settings are kept" "config missing or on" r '[ "$(uci -q get shadow-vpn.main.enabled)" = 0 ]'
 if menu_has_shadow; then nok "LuCI menu entry gone after uninstall" "still in admin/menu"; else ok "LuCI menu entry gone after uninstall"; fi
 if stub_used shadow-vpn/files/usr/libexec/shadow-vpn/apply; then
@@ -358,7 +386,51 @@ expect "uninstall again says not installed" "rc=$rc" sh -c "[ $rc = 0 ] && grep 
 # that publishes a new version sets PUBLISHED_RELEASE=skip: the release it publishes replaces that one, and a
 # broken latest release must not block the release that fixes it. Every other run checks it: ci.yml, and
 # release.yml on a push to the default branch whose version is released already (or whose gate failed).
+# The same holds for the updater (DESIGN.md 11): this tree's updater asks GitHub the way a router does, its download
+# step fetches the published release through both of its paths, and the updater of the published release, once
+# there is one, installs this tree's build.
 REPO="$(sed -n 's/^REPO=//p' "$TREE/install.sh")"
+RATE_LIMITED='GitHub refused the request: too many requests from this address. Try again in an hour.'
+
+# json_field <file> <key>: a top-level field of the JSON object on the last line of <file> (a string bare, anything
+# else as JSON), '<no JSON>' when that line is none
+json_field() {
+	python3 -I - "$1" "$2" <<'EOF'
+import json, sys
+lines = [l for l in open(sys.argv[1], encoding='utf-8', errors='replace').read().splitlines() if l.strip()]
+try:
+    v = json.loads(lines[-1]).get(sys.argv[2])
+except Exception:
+    v = '<no JSON>'
+print(v if isinstance(v, str) else json.dumps(v))
+EOF
+}
+
+# release_json <dir> <version> <base URL>: <dir>/release.json shaped like GitHub's release API, with the fields the
+# updater reads, for SHA256SUMS and the files it lists, as the updater finds it under <base URL>
+release_json() {
+	python3 -I - "$1" "$2" "$3" "$REPO" <<'EOF'
+import hashlib, json, os, sys, time
+d, v, base, repo = sys.argv[1:5]
+names = ['SHA256SUMS'] + [l.split()[1] for l in open(os.path.join(d, 'SHA256SUMS')) if l.strip()]
+assets = []
+for i, n in enumerate(names):
+    data = open(os.path.join(d, n), 'rb').read()
+    assets.append({'name': n, 'url': 'https://api.github.com/repos/%s/releases/assets/%d' % (repo, 900001 + i),
+                   'size': len(data), 'digest': 'sha256:' + hashlib.sha256(data).hexdigest()})
+with open(os.path.join(d, 'release.json'), 'w') as f:
+    json.dump({'tag_name': v, 'name': v, 'html_url': '%s/releases/tag/%s' % (base, v), 'draft': False,
+               'prerelease': False, 'published_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+               'body': 'Test release %s.' % v, 'assets': assets}, f)
+EOF
+}
+
+# github_check: this tree's updater asks GitHub for the latest release (no base URL); its stdout in gh-check.out
+github_check() {
+	docker exec "$ROUTER" "$UPDATER" check </dev/null >"$WORK/gh-check.out" 2>"$WORK/gh-check.err"
+}
+gh() { json_field "$WORK/gh-check.out" "$1"; }
+
 if [ "${PUBLISHED_RELEASE:-check}" = skip ]; then
 	ok "the published release # SKIP PUBLISHED_RELEASE=skip"
 else
@@ -378,6 +450,17 @@ else
 		expect "no release of $REPO on GitHub yet: install.sh says so, in Russian and English" "rc=$rc: $(tail -n 2 "$WORK/published.log")" \
 			sh -c "[ $rc -ne 0 ] && grep -q 'No Shadow release is published yet' '$WORK/published.log' && grep -q 'Shadow ещё не опубликован' '$WORK/published.log' && ! grep -q 'Check access to github.com' '$WORK/published.log'"
 		expect "...and installs nothing" "something got installed" r '! apk info -e shadow-vpn && ! apk info -e luci-app-shadow-vpn'
+		run_install "$WORK/tree.log" "$BASE/v2"
+		rc=$?
+		expect "this tree's build installs, for its updater" "rc=$rc: $(tail -n 3 "$WORK/tree.log")" test "$rc" = 0
+		github_check
+		rc=$?
+		if [ "$(gh error)" = "$RATE_LIMITED" ]; then
+			ok "update check against GitHub # SKIP GitHub's rate limit for this address"
+		else
+			expect "...and its update check says so too" "rc=$rc: $(cat "$WORK/gh-check.out")" \
+				test "$rc $(gh ok) $(gh error)" = "1 false No Shadow release is published yet."
+		fi
 	else
 		run_install "$WORK/published.log" ""
 		rc=$?
@@ -385,6 +468,106 @@ else
 			sh -c "[ $rc = 0 ] && grep -Eq 'Shadow ${tag#v}-r[0-9]+ is installed and is off' '$WORK/published.log'"
 		expect "...all three packages of $tag" "$(r 'apk list -I 2>/dev/null' | grep shadow-vpn | tr '\n' ' ')" \
 			r "apk info -e shadow-vpn luci-app-shadow-vpn luci-i18n-shadow-vpn-ru && apk list -I shadow-vpn 2>/dev/null | grep -q '^shadow-vpn-${tag#v}-r'"
+		expect "...with the lists cron line" "lines=$(cron_both)" test "$(cron_lines)" = 1
+
+		# this tree's build as the release after $tag: the updater of $tag installs it from a base URL when $tag has
+		# one (an installed updater of any older version keeps installing later releases), else install.sh does.
+		# Either way the router ends with both cron lines: an upgrade from a release with the lists line only adds
+		# the update line.
+		pub="${tag#v}"
+		next="${pub%.*}.$((${pub##*.} + 1))"
+		if build "$next" next && release_json "$WORK/www/next" "$next" "$BASE/next" &&
+			(cd "$WORK/www" && COPYFILE_DISABLE=1 tar -cf - next) | docker exec -i "$WEB" tar -xf - -C /srv; then
+			ok "this tree's build as $next, served with a release.json"
+		else
+			nok "this tree's build as $next, served with a release.json" "$(tail -n 5 "$WORK/build-$next.log")"
+		fi
+		if r "[ -x $UPDATER ]"; then
+			docker exec -e SHADOW_BASE_URL="$BASE/next" "$ROUTER" "$UPDATER" install </dev/null >"$WORK/pub-update.out" 2>"$WORK/pub-update.err"
+			rc=$?
+			expect "the updater of $tag installs this tree's build $next from a base URL" "rc=$rc: $(cat "$WORK/pub-update.out")" \
+				test "$rc $(json_field "$WORK/pub-update.out" ok) $(json_field "$WORK/pub-update.out" to)" = "0 true $next"
+		else
+			run_install "$WORK/pub-upgrade.log" "$BASE/next"
+			rc=$?
+			expect "install.sh upgrades $tag, which has no updater, to this tree's build $next" "rc=$rc: $(tail -n 3 "$WORK/pub-upgrade.log")" \
+				sh -c "[ $rc = 0 ] && grep -q 'upgraded to $next-r1' '$WORK/pub-upgrade.log'"
+		fi
+		expect "...$next-r1 is installed" "$(r 'apk list -I shadow-vpn 2>/dev/null')" \
+			r "apk list -I shadow-vpn 2>/dev/null | grep -q '^shadow-vpn-$next-r1 '"
+		expect "...with one of each cron line" "lines=$(cron_both)" test "$(cron_both)" = "1 1"
+
+		# this tree's updater asks GitHub's API the way a router does: $tag is the latest release, older than $next
+		github_check
+		rc=$?
+		if [ "$(gh error)" = "$RATE_LIMITED" ]; then
+			ok "update check against GitHub # SKIP GitHub's rate limit for this address"
+		else
+			expect "update check against GitHub: the latest release is $tag" "rc=$rc: $(cat "$WORK/gh-check.out")" \
+				test "$rc $(gh ok) $(gh latest) $(gh installed) $(gh available)" = "0 true $pub $next false"
+			expect "...one JSON line on stdout, nothing else" "$(cat "$WORK/gh-check.out")" test "$(grep -c '' "$WORK/gh-check.out")" = 1
+		fi
+
+		# update.uc's download step for $tag through each of its two paths (install.sh's): 1 the tag's download URL,
+		# 2 the asset API URL after the download URL answered 404. A fake apk database says 0.0.1 is installed, so
+		# $tag is newer; stub commands keep the rest off the router: apk keeps the files it is given, with the
+		# SHA256SUMS they were checked against, and rpcd's reload does nothing. The install then ends in "did not
+		# install", after every download was checked.
+		limited=0
+		for path in 1 2; do
+			docker exec -i "$ROUTER" sh -s "$path" >"$WORK/dl$path.out" 2>&1 <<'EOF'
+D=/tmp/shv-dl$1
+rm -rf "$D"
+mkdir -p "$D/bin" "$D/kept" "$D/run" "$D/etc"
+printf 'P:shadow-vpn\nV:0.0.1-r1\n\nP:luci-app-shadow-vpn\nV:0.0.1-r1\n\nP:luci-i18n-shadow-vpn-ru\nV:0.0.1-r1\n' > "$D/installed"
+ln -s /bin/df "$D/bin/df"
+printf '#!/bin/sh\nexit 0\n' > "$D/bin/rpcd"
+cat > "$D/bin/apk" <<STUB
+#!/bin/sh
+# install_test.sh: keeps what "apk add" is given, and the SHA256SUMS next to it; "apk update" does nothing
+[ "\$1" = add ] || exit 0
+for a; do
+	case "\$a" in *.apk) cp "\$a" "\${a%/*}/SHA256SUMS" $D/kept/ ;; esac
+done
+STUB
+cat > "$D/bin/uclient-fetch" <<STUB
+#!/bin/sh
+# install_test.sh: the real uclient-fetch, every URL logged; on path 2 GitHub's download URLs answer 404
+for a; do url="\$a"; done
+echo "\$url" >> $D/urls
+case "$1:\$url" in
+2:https://github.com/*/releases/download/*) echo "HTTP error 404" >&2; exit 8 ;;
+esac
+exec /bin/uclient-fetch "\$@"
+STUB
+chmod 755 "$D/bin/apk" "$D/bin/rpcd" "$D/bin/uclient-fetch"
+cat > "$D/dl.uc" <<STUB
+import { install } from 'shadow-vpn.update';
+print(sprintf('%J\n', install({ bin: '$D/bin', run: '$D/run', etc: '$D/etc', lock: '$D/lock', db: '$D/installed',
+	mode: 'manual', blocked: () => false })));
+STUB
+ucode "$D/dl.uc"
+EOF
+			if [ "$(json_field "$WORK/dl$path.out" error)" = "$RATE_LIMITED" ]; then
+				ok "download step, path $path # SKIP GitHub's rate limit for this address"
+				limited=1
+				continue
+			fi
+			expect "download step, path $path: every file of $tag downloaded and checked" "$(tail -n 3 "$WORK/dl$path.out")" \
+				test "$(json_field "$WORK/dl$path.out" from) $(json_field "$WORK/dl$path.out" to) $(json_field "$WORK/dl$path.out" error)" = \
+					"0.0.1 $pub The package manager did not install Shadow $pub."
+			expect "download step, path $path: the packages match $tag's SHA256SUMS" "$(r "ls /tmp/shv-dl$path/kept" | tr '\n' ' ')" \
+				r "cd /tmp/shv-dl$path/kept && grep -q '  shadow-vpn.apk\$' SHA256SUMS && grep '\.apk\$' SHA256SUMS > apk.sums && sha256sum -c apk.sums"
+		done
+		if [ "$limited" = 0 ]; then
+			expect "download step, path 1: every file from the tag's download URL" "$(r 'cat /tmp/shv-dl1/urls' | tr '\n' ' ')" \
+				r "[ -s /tmp/shv-dl1/urls ] && ! grep -v -e '^https://api.github.com/repos/$REPO/releases/latest\$' -e '^https://github.com/$REPO/releases/download/$tag/' /tmp/shv-dl1/urls"
+			n="$(r "grep -c '\.apk\$' /tmp/shv-dl2/kept/apk.sums" 2>/dev/null | tr -cd '0-9')"
+			expect "download step, path 2: SHA256SUMS and the $n packages from the asset API" "$(r 'cat /tmp/shv-dl2/urls' | tr '\n' ' ')" \
+				test "$(r "grep -c '^https://api.github.com/repos/$REPO/releases/assets/[0-9]*\$' /tmp/shv-dl2/urls")" -ge "$((${n:-0} + 1))"
+			expect "download step: both paths gave the same files" "they differ" \
+				r 'cd /tmp/shv-dl1/kept && for f in *.apk SHA256SUMS; do cmp -s "$f" "/tmp/shv-dl2/kept/$f" || exit 1; done'
+		fi
 	fi
 fi
 

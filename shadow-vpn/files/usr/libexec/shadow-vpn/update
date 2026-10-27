@@ -1,0 +1,37 @@
+#!/usr/bin/ucode
+'use strict';
+
+// update check | install [--auto X.Y.Z] | due (DESIGN.md 11, CONTRACTS §8). Prints one JSON line; exit 0 when
+// the action succeeded, 1 when it failed, 2 on a usage error. A busy lock fails check and install, while
+// install --auto and due leave quietly: the next due tries again. `due` is the hourly cron entry; LuCI runs
+// check and install as jobs.
+
+import { load as load_config } from 'shadow-vpn.config';
+import { set_log_level } from 'shadow-vpn.state';
+import { check, install, due } from 'shadow-vpn.update';
+
+const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
+
+let action = ARGV[0], auto = null;
+let usage = !(action in [ 'check', 'install', 'due' ]) || length(ARGV) > 1;
+
+// --auto <version>: started by due for the version it saw, which the install then insists on
+if (action == 'install' && length(ARGV) == 3 && ARGV[1] == '--auto' && match(ARGV[2], VERSION)) {
+	auto = ARGV[2];
+	usage = false;
+}
+
+if (usage) {
+	warn('usage: update check | install [--auto X.Y.Z] | due\n');
+	exit(2);
+}
+
+let model = load_config();
+
+set_log_level(model?.main?.log_level ?? 'warning');
+
+let opts = { config: model };
+let res = (action == 'check') ? check(opts) : (action == 'install') ? install(opts, auto) : due(opts);
+
+print(sprintf('%J', res), '\n');
+exit(res?.ok ? 0 : 1);

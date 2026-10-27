@@ -30,9 +30,9 @@ Goals, in priority order:
 4. Behaviour parity with the desktop app where it makes sense on a router (routing precedence, link parsing,
    host-key trust, list format, rules import/export, messages).
 
-Not ported: the SSH terminal (the router has ttyd and users have SSH clients), tray/window/theme/update UI,
-TUN/wintun/PAC/system proxy, process rules (replaced by LAN-device rules), the public profile list, sleep/wake
-handling.
+Not ported: the SSH terminal (the router has ttyd and users have SSH clients), tray/window/theme UI, the desktop's
+updater (the router updates from this repository's releases, 11.1), TUN/wintun/PAC/system proxy, process rules
+(replaced by LAN-device rules), the public profile list, sleep/wake handling.
 
 ## 2. Supported systems
 
@@ -60,7 +60,7 @@ ssh-vpn-client-luci-app-shadow-ucode/
     files/usr/share/nftables.d/chain-pre/input/30-shadow-vpn.nft
     files/usr/libexec/shadow-vpn/              helpers (sh + ucode), see 3.2
     files/usr/share/ucode/shadow-vpn/*.uc      ucode modules: const, config, secrets, state, xray, links, validate,
-                                               lists, routing (nft + dnsmasq), ssh, keys (CONTRACTS.md)
+                                               lists, routing (nft + dnsmasq), ssh, keys, update (11.1); CONTRACTS.md
   luci-app-shadow-vpn/           LuCI package (noarch)
     htdocs/luci-static/resources/view/shadow-vpn/*.js
     root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
@@ -88,10 +88,12 @@ ssh-vpn-client-luci-app-shadow-ucode/
 | Path | What |
 |---|---|
 | `/etc/config/shadow-vpn` | UCI: settings, servers, keys, profiles, rules (no secrets) |
-| `/etc/shadow-vpn/` (0700) | `secrets/<sid>.{password,passphrase,link}`, `keys/<sid>`, `known_hosts`, `trusted.<sid>`, `fingerprint.key` (the key of the profile identities in UCI, 5), `lists/{proxy,direct}.lst` + `.sha256`. Files 0600, written tmp + fsync + rename (UBIFS: a power cut right after a save must not leave an empty file). Listed in `/lib/upgrade/keep.d/shadow-vpn`, so sysupgrade and backups keep it next to `/etc/config/shadow-vpn` |
-| `/var/run/shadow-vpn/` (tmpfs, 0700) | `xray.json`, `ssh.<sid>.params`, `table.nft` (the full ruleset incl. gate and server elements, used by heals), `dnsmasq.conf` / `dnsmasq.down.conf` (the two DNS variants, 6.5), `state.json`, `attention.json`, `gate`, `fatal`, `ssh.<sid>.{log,state,last}`, `hostkey.<sid>.{seen,status}`, `check.json`, `jobs/*.json`, `patterns`, `wan_dns`, `wan_networks`, `lan_state` (what the iface hook compares, 6.2), `active` |
+| `/etc/shadow-vpn/` (0700) | `secrets/<sid>.{password,passphrase,link}`, `keys/<sid>`, `known_hosts`, `trusted.<sid>`, `fingerprint.key` (the key of the profile identities in UCI, 5), `lists/{proxy,direct}.lst` + `.sha256`, `update.state` (the last automatic update attempt, 11.1). Files 0600, written tmp + fsync + rename (UBIFS: a power cut right after a save must not leave an empty file). Listed in `/lib/upgrade/keep.d/shadow-vpn`, so sysupgrade and backups keep it next to `/etc/config/shadow-vpn` |
+| `/var/run/shadow-vpn/` (tmpfs, 0700) | `xray.json`, `ssh.<sid>.params`, `table.nft` (the full ruleset incl. gate and server elements, used by heals), `dnsmasq.conf` / `dnsmasq.down.conf` (the two DNS variants, 6.5), `state.json`, `attention.json`, `gate`, `fatal`, `ssh.<sid>.{log,state,last}`, `hostkey.<sid>.{seen,status}`, `check.json`, `jobs/*.json`, `patterns`, `wan_dns`, `wan_networks`, `lan_state` (what the iface hook compares, 6.2), `active`; the updater's `update.json`, `update.run.json`, `update.work/` and `update.base_url` (11.1) |
 | `<dnsmasq confdir>/shadow-vpn.conf` | generated `nftset=`, `server=/host/…` (normal upstream for direct names; server hosts and the router's NTP server names on a resolver outside the tunnel, 6.5; `127.0.0.1#5300` for tunnelled ones), `max-ttl` (unless the instance sets `max_ttl`), (full mode) `no-resolv` and the default `server=`, (`ipv6=0`, full mode) `filter-AAAA`, (full mode with no resolver outside the tunnel) `host-record=` for the server names; never a `servers-file=` (6.5); confdir from `dhcp.<sec>.confdir`, default `/tmp/dnsmasq.<sec>.d` for the instance serving `lan` (the only path visible in its ujail). Its temp file is `.shadow-vpn.conf.tmp`: conf-dir skips dot files |
-| `/usr/libexec/shadow-vpn/` | `apply`, `job`, `gate-set`, `ssh-run`, `ssh-up`, `ssh-askpass`, `ssh-hostkey`, `ssh-classify`, `xray-run`, `tunnel-check`, `fw4-hook`, `lists` |
+| `/usr/libexec/shadow-vpn/` | `apply`, `job`, `gate-set`, `ssh-run`, `ssh-up`, `ssh-askpass`, `ssh-hostkey`, `ssh-classify`, `xray-run`, `tunnel-check`, `fw4-hook`, `lists`, `update` |
+| `/var/lock/` | `shadow-vpn.lock` (Shadow's lock, 6.1) and `shadow-vpn-update.lock` (the updater's own, 11.1) |
+| `/etc/crontabs/root` | `23 * * * * /usr/libexec/shadow-vpn/lists refresh due` (9) and `47 * * * * /usr/libexec/shadow-vpn/update due` (11.1), each with `>/dev/null 2>&1`. Post-install adds each line that is missing on its own, so an upgrade from a build with only the lists line gains the second; pre-deinstall removes both |
 
 ## 4. Packages and dependencies
 
@@ -128,6 +130,7 @@ config shadow 'main'
 	option router_traffic '1'       # the router's own connections follow the same rules
 	option lists_refresh '24'       # hours between automatic list refreshes, 0 = manual only
 	option log_level 'warning'      # info | warning | error (ours and xray's)
+	option update 'notify'          # manual | notify | auto: updates from GitHub releases (11.1)
 
 config list 'proxy'                 # "Blocked in Russia": Russia/inside-raw.lst
 	option enabled '0'
@@ -195,7 +198,8 @@ config rule
 
 One lock, `flock /var/lock/shadow-vpn.lock`, around apply, teardown, re-render and list apply. Jobs converge on the
 desired state in UCI (`enabled`, selection, rules) instead of issuing imperative start/stop, so the last writer wins
-cleanly.
+cleanly. The updater (11.1) has a lock of its own and never takes this one: the package upgrade it runs starts a
+converge that needs it.
 
 Code that runs inside a synchronous context never waits for the lock: the fw4 include (runs under fw4's lock),
 `ssh-up` (LocalCommand, blocks ssh), procd triggers (one serial queue for the whole system) and hotplug. They try
@@ -374,14 +378,19 @@ Derived on demand by the rpcd `status` call; nothing resident keeps it:
   negotiate, closed, dead_link) mapped to the desktop's messages ([desktop spec §15.3](https://github.com/stansful/ssh-vpn-client-electron/blob/master/FUNCTIONAL_SPEC.md));
 - `attention.json`: events that stay until dismissed or until their cause is gone (fatal stop, nothing to route,
   config rejected by xray or nft, port busy, DNS file rejected, DNS lookups bypassing the tunnel in full mode, DNS
-  servers that depend on the tunnel, invalid rules, list download failed); codes in CONTRACTS.md §8. The fatal ones
+  servers that depend on the tunnel, invalid rules, list download failed, a newer Shadow release, a failed
+  automatic update); codes in CONTRACTS.md §8. The fatal ones
   go with their flag: `ssh_fatal` when a session comes up again or a Connect or changed server clears `RUN/fatal`,
   `xray_config` when `RUN/xray.fatal` is cleared; a converge while the instance stays parked keeps them and the
   error phase (lab), and so does a reconnecting ssh while xray is parked (its tunnel carries nothing). Off clears
-  them with their flags (6.4); `list_failed` goes with the next successful refresh of that list.
+  them with their flags (6.4); `list_failed` goes with the next successful refresh of that list. The updater's
+  two (11.1) outlive Off: `update_available` goes once the installed version is the latest or the update mode is
+  `manual`, `update_failed` with the next successful update or once its version (or a later one) got installed
+  another way.
 - Durations come from the router: `state.json` stamps `since_up` (uptime) next to `since`, and status returns
   `age` (and `check.age`, `tunnel.last_seen_age`), because the router clock can be days off until NTP sets it
-  after a power cut, and the browser's clock is another one.
+  after a power cut, and the browser's clock is another one. The updater's files on tmpfs stamp the same twins
+  (`checked_up`, `at_up`, `started_up`), and `update_status` returns ages from them (11.1).
 
 ### 6.7 Tunnel down: kill switch and fallback
 
@@ -803,15 +812,16 @@ Menu: `admin/services/shadow-vpn` "Shadow" (order 45), pages as tabs (the approv
 | Xray | profiles (add link, import many, search, select, pin, rename, show link, delete, delete unpinned, unsupported/insecure badges); the selected profile has the "selected" badge only while the transport is Xray, and Select (which switches the transport) while it is SSH |
 | Routing | mode cards; the two lists (use, refresh, view, count, updated, auto-refresh); rules tabs Domains / IP / Devices (add with validation, enable, delete, import/export JSON compatible with the desktop); device picker from DHCP leases |
 | Log | Shadow, xray and ssh lines, level filter, refresh, download, follow |
-| Settings | tunnel down: kill switch (default) or direct; autostart; UDP over SSH; tunnel DNS; IPv6; redirect LAN DNS to the router; router traffic; log level; about/update command |
+| Settings | tunnel down: kill switch (default) or direct; autostart; UDP over SSH; tunnel DNS; IPv6; redirect LAN DNS to the router; router traffic; log level; updates (mode, status, Check now, Update to X; 11.1); about (versions, the console update command) |
 
 Change from the mock: the "wait before going direct" seconds field is gone; detection time is fixed by the
 observatory (about 10 s) and shown as text.
 
 - One rpcd ucode plugin `luci.shadow-vpn` for fast reads and short writes (status, select, save server/key/
-  profile, import links, rules import/export, pin/forget host key, logs, dismiss attention, and `settings_set` for
-  the settings outside the Settings form: the Overview check endpoint, the Routing mode cards, list auto-refresh). Anything that can
-  take seconds (On/Off, tunnel check, list download, reload after writes) runs as a
+  profile, import links, rules import/export, pin/forget host key, logs, dismiss attention, update status, and
+  `settings_set` for the settings outside the Settings form: the Overview check endpoint, the Routing mode cards,
+  list auto-refresh). Anything that can take seconds (On/Off, tunnel check, list download, reload after writes,
+  update check and install) runs as a
   detached job (`/usr/libexec/shadow-vpn/job`) writing `/var/run/shadow-vpn/jobs/<id>.json`; the view polls it. A
   slow ucode call blocks all of rpcd, and calls are cut at 30 s.
 - Status polling every 5 s with one batched call, paused while the tab is hidden. `status` keeps its validated
@@ -831,6 +841,18 @@ observatory (about 10 s) and shown as text.
 - The tunnel check's result, failed or not, is shown in its box only; the router returns the HTTP status line and
   the SOCKS reply code as data, and the page words them. Backend messages are English msgids in the Russian
   catalog (a test collects them from the sources, 12).
+- **Updates** (Settings, 11.1): the mode (`main.update`, saved by the form) and one status node, kept on the view
+  because the form re-renders every option after Save: installed and latest version with the release date and a
+  link to its notes, the last check and the last install (from → to, automatic, rolled back, error), automatic
+  attempts stopped after three failures, a release that must be installed from the console, an install in
+  progress with its stage, and the router's own time and zone next to the 03:00–06:00 window. "Check now" runs
+  `update_check`; "Update to X" (only for a newer release that is not console-only, while nothing runs) asks first,
+  then runs `update_install`. While an install runs the page polls `update_status` every 3 s and takes failed
+  calls in its stride (rpcd restarts during `apk add`); after a changed version it reloads, since the views
+  changed with it. An install that outlasts the page's 15-minute wait for its job (`apk add` has no deadline) is
+  left to that poll: when `update_status` shows it ended, the page compares the installed version with the one
+  before the click, reloads when it changed, and shows the error when this run failed. The Overview shows `update_available` (info) and `update_failed` (warning) as banners that link
+  to Settings. About keeps the versions and the install.sh one-liner as "Update from the console".
 - **Log:** the plugin runs `/sbin/logread -l <n>` with constant arguments (no shell, no user text), keeps lines
   tagged `shadow-vpn`, `xray`, `ssh` and the tags the helpers really log under (`xray-run`, `ssh-run`,
   `ssh-openssh`), and the browser filters level and text.
@@ -858,8 +880,9 @@ So routers pair `install.sh` from the default branch with the packages of the la
 them at once (raw.githubusercontent.com caches the file for up to 5 minutes, so right after a release or a push the
 old one can still meet the other side's new files). The rule: `install.sh` on the default branch always installs the
 current latest release, and the asset names, the `SHA256SUMS` format and `SHADOW_BASE_URL` change only compatibly
-both ways. `tests/unit/packaging/install_test.sh` checks the first half on every push: the tree's `install.sh`
-installs the latest release from GitHub the way a router does, or, while none is published, says so. A release run
+both ways (the updater on the routers adds a stricter rule, 11.1). `tests/unit/packaging/install_test.sh` checks
+the first half on every push: the tree's `install.sh` installs the latest release from GitHub the way a router
+does, or, while none is published, says so. A release run
 that publishes a new version skips that check (`PUBLISHED_RELEASE=skip`): the release it publishes replaces that
 one, and a broken latest release must not block its own fix; a push to the default branch whose version is already
 released keeps the check. The `install.sh` copy in a release is for reference (its sum is in `SHA256SUMS`); nothing
@@ -890,8 +913,8 @@ downloads it.
    (into a cache under the install's temp dir, removed afterwards). The free-space check asks for 45 MB on a fresh
    install (xray-core, OpenSSH, OpenSSL, dnsmasq-full) and 5 MB when the dependencies are already installed;
    `MemAvailable` 48 MB / 16 MB.
-6. Post-install: `fw4 -q reload`, cron line, `rpcd reload`, clear the LuCI cache. The service converges: a fresh
-   install stays off until the user turns Shadow on; an upgrade keeps it on if it was on.
+6. Post-install: `fw4 -q reload`, the cron lines (3.2), `rpcd reload`, clear the LuCI cache. The service
+   converges: a fresh install stays off until the user turns Shadow on; an upgrade keeps it on if it was on.
 
 Before any download (after the clock check) install.sh looks at Shadow: when it is on (`active`) with the kill
 switch and `router_traffic`, and xray's own probe (`127.0.0.1:12348/debug/vars`: `observatory.proxy` without
@@ -904,10 +927,18 @@ mode only listed hosts are blocked, so it goes on and adds the same hint if a do
 Fetching install.sh itself is blocked in that state too (the one-liner then only shows wget's error), so the hint
 helps when the script is already on the router or the tunnel goes down during a run.
 
+install.sh takes the updater's lock (`/var/lock/shadow-vpn-update.lock`, 11.1) before it does anything, for an
+install, an upgrade and `--uninstall` alike, and refuses in Russian and English while an update from LuCI or at night
+holds it: that update's `apk add`, rollback or restart of Shadow would undo what install.sh did. It keeps the lock on
+fd 9 of its own shell and runs the work with `9>&-`, so no child inherits it (busybox `start-stop-daemon -b` keeps
+descriptors above 2, and the package scripts start detached jobs); the shell holds the lock meanwhile through the
+close-on-exec copy it saves (busybox ash, lab image). `tests/unit/packaging/install_test.sh` checks the refusal and
+that the lock is free after an upgrade.
+
 `install.sh --uninstall` sets `enabled=0`, runs `apply teardown`, removes our packages and keeps
 dnsmasq-full (it adds `dnsmasq-full` to `/etc/apk/world` first, so it is not removed as an orphan). Package
 `pre-deinstall` does the same if the packages are removed with `apk del`: `enabled=0` and
-teardown, then it removes the cron line and the fw4 include (found by its path). Its teardown is `apply teardown
+teardown, then it removes the cron lines and the fw4 include (found by its path). Its teardown is `apply teardown
 --from-init`: `default_prerm`'s `stop` has already deleted the procd service, and a teardown that declared the
 instances again would register the service and its triggers once more, which procd would then run against the
 removed files on every dhcp commit and WAN ifup until a reboot. A plain `apk del` keeps
@@ -975,6 +1006,156 @@ still unreleased). As every new version must be higher than every tag, the new r
 routers never move back. A usign signature over `SHA256SUMS` with the public key embedded in install.sh is optional
 hardening for later.
 
+### 11.1 Updates from LuCI
+
+install.sh's upgrade path also runs on the router itself, so Shadow updates from LuCI and, if the user wants, on its
+own at night. `main.update` (5) says how: `manual` (only when the user presses "Check now"), `notify` (the default:
+the router asks GitHub for the latest release once a day and shows a banner when it is newer) or `auto` (the same,
+and the new version is installed between 03:00 and 06:00 router time). The code is `update.uc` (CONTRACTS.md §8) and
+its CLI `/usr/libexec/shadow-vpn/update check | install [--auto X.Y.Z] | due`, which prints one JSON line on stdout
+and nothing else; LuCI runs `check` and `install` as the jobs `update-check` and `update-install` (10), cron runs
+`due` every hour at :47 (3.2).
+
+- **Check.** One request for the latest release: `https://api.github.com/repos/<repo>/releases/latest` with
+  `Accept: application/vnd.github+json`, at most 256 KiB. The updater keeps `tag_name`, which must be a version
+  (`X.Y.Z`, also `vX.Y.Z` and `X.Y.Z-rN`, as `scripts/lib/version.sh` reads them), `html_url` only under the
+  repository's releases page, `published_at`, `body` (the notes, CR removed and cut to 4000 characters at a line
+  end, and whether one of its lines is exactly `shadow-update: console`) and per asset its name, API URL, size and
+  `sha256:` digest. It writes them to `RUN/update.json` with the installed version from apk's database
+  (`/lib/apk/db/installed`); a failed check records its error and keeps the release of the last good one. In
+  `notify` and `auto` a newer release raises attention `update_available` once per version (the version announced
+  is kept on tmpfs, so after a reboot the banner can come back once); a check that finds nothing newer clears it,
+  and `manual` never raises it.
+- **Downloads** are pinned to the checked release: every file comes from that release's tag,
+  `https://github.com/<repo>/releases/download/<tag>/<file>`, and else from the asset's API URL with `Accept:
+  application/octet-stream`, install.sh's two paths. The pin ends install.sh's race of "latest" moving between two
+  downloads. uclient-fetch runs with `-T 15` and without `-q`: with `-q` it prints nothing on an HTTP error, and the
+  status is what tells "no release is published yet" (404) from GitHub's rate limit (403, 429) and an unreachable
+  GitHub (any other failure). It never runs in a pipeline and is `exec`'d under ucode's `system()` deadline: busybox
+  has no `timeout`, and only an `exec`'d child is killed when the deadline passes (lab). Its stderr is never logged
+  or shown, as it carries the signed redirect URLs. Three tries 3 s apart, 60 s each (a 404 or the rate limit ends
+  them at once); all downloads of one install share 300 s, the check's request 90 s. A file must have the size the
+  release lists (8 MiB at most), the sha256 that `SHA256SUMS` gives it and, when GitHub lists one, the asset's
+  digest.
+- **Install** checks first, in this order: the clock (past install.sh's floor, as TLS needs it; the updater does
+  not set it, its message points to System → System), a known installed version, 5 MB free on `/overlay` (else
+  `/`) and 16 MB `MemAvailable` (install.sh's upgrade figures), and the kill switch (below). Then it checks for the
+  latest release again: nothing newer ends here with nothing downloaded or recorded, and a release marked
+  `shadow-update: console` is refused with the console command (the way to publish a release that the updaters on
+  the routers must not install: a maintainer commits `build/CONSOLE_UPDATE` holding that version before the release,
+  and `.github/scripts/release-notes.sh` ends the notes the release is created and published with by that line, so
+  no router sees the release as the latest without it; DEVELOPMENT.md, Releases). It downloads
+  `SHA256SUMS` of the tag into `RUN/update.work` (0700, removed before and after) and installs every `*.apk` it
+  names except the LuCI packages that are not installed now: an update never adds LuCI or the Russian translation
+  unasked. `shadow-vpn.apk` must be there; an installed package the release no longer ships is left alone. A Shadow
+  removed meanwhile (an `apk del` while the files downloaded) stops it there: installing would bring it back. Then
+  `apk update` (300 s at most, a failure tolerated as in install.sh), in an automatic install the dry run of the
+  rollback (below), and `apk add --cache-dir <work>/cache --cache-predownload --allow-untrusted <files>` as
+  install.sh runs it, never killed (apk may be in the middle of its transaction). apk's database, not its exit code,
+  says what happened: apk 3 exits non-zero when a package script failed after the transaction went through, and on
+  every later run once one did (lab image). Shadow at the release's version is an install, whatever the exit code
+  (apk's output goes to the log as warnings); otherwise the failure reports apk's last `ERROR:` line (or that the
+  release was not installed) and logs the last 20 lines of its output, and when part of the release went in
+  anyway, an automatic install puts the previous version back as below. Then what install.sh does after it: Shadow
+  back on when it was on and `enabled` is not 1 now, the LuCI caches removed, `rpcd reload`. rpcd on reload re-execs
+  and thaws the open sessions with their ACLs re-granted, so the new methods work without a new login (lab).
+- **The updater replaces itself.** It runs as a detached job (10), its modules are loaded before apk starts, and apk
+  replaces files by rename, so the running process keeps its code; after `apk add` it runs no Shadow helper except
+  through the init script. apk runs the new package's post-install as on any upgrade (uci-defaults, `fw4 -q reload`,
+  the cron lines, `rpcd reload`, then `/etc/init.d/shadow-vpn start`, which converges), and no pre-deinstall. That
+  start declares the same procd instances when the new version renders the same files, and procd keeps a running
+  instance whose declaration did not change (the same command, files and env): the old `xray-run` and `ssh-run`
+  would go on running. So when the tunnel was up, the updater compares the instances' pids (`ubus call service
+  list` of `shadow-vpn`) with those from before `apk add`, deletes each one that kept its pid (`ubus call service
+  delete`) and runs `/etc/init.d/shadow-vpn start` again, which declares them anew. The nft table and the kill
+  switch stay meanwhile: the LAN waits a few seconds instead of going direct. A tunnel that was down is left as it
+  is; the new helpers run from Shadow's next start.
+- **Kill switch.** The test is install.sh's (Shadow on and `active`, kill switch, `router_traffic`, and xray's probe
+  not `alive: true`, or no answer at all; up to 15 s for a first verdict while the metrics answer without one). In
+  full mode an install refuses before any download and asks to turn Shadow off, update and turn it back on; in split
+  mode it goes on. A check or download that cannot reach GitHub while the test holds adds that the kill switch may
+  be what blocks it. `due` never starts an automatic install while the test holds, in either mode.
+- **Tunnel after the install.** When the tunnel was up before (Shadow on, phase `connected`, `tunnel.alive`), the
+  updater waits up to 90 s, polling every 2 s, until the tunnel is back: every instance from before runs again
+  with a new pid, the phase is `connected` and xray's probe says `alive`, on consecutive polls over at least 10 s
+  (`UPDATE.stable`). One good poll proves nothing: right after `apk add` the state can still say `connected` from
+  before the restart, and a helper can fail a few seconds after it started. A manual install that does not get
+  there reports the failure and keeps the new version: the user is at the page. An automatic install puts the
+  previous version back. For that it downloads and verifies, before it installs anything, the installed version's
+  own packages from that version's release (tag `X.Y.Z`, the package names installed now) into the work dir, and
+  does not install unattended when they cannot be had (a failed attempt). It also asks apk for a dry run of the
+  upgrade (`apk add --simulate --no-network`, offline with the indexes `apk update` left in the work dir's cache, so it
+  never waits on a feed; lab image): a package that only the installed version needs is purged by the upgrade, and
+  the rollback could not download it again once the tunnel is down (the kill switch blocks the router), so each
+  package the dry run purges is fetched (`apk fetch`) into the work dir while the feeds can still be reached; a dry
+  run that fails ends the install with apk's reason, and a package that cannot be fetched counts as missing rollback
+  packages. The rollback is `apk add --no-network` of all those files (it never waits on a feed),
+  then `apk del --no-network` of the purged packages' names, as apk keeps a package given as a file pinned in its
+  world and they are dependencies again; then the same restart of the instances and another wait. The result says
+  whether the old version is back (apk's database decides here too). Shadow removed or turned off during the wait
+  (from the console) is not put back: the tunnel was not expected then, and the packages would start it again.
+- **Due** (hourly). In `manual` it only clears `update_available`. Otherwise it checks when the last check is older
+  than a day, or 3 hours after a failed one, each less 10 minutes so that the hourly cron does not slip by an hour
+  every time; installed ≥ latest clears the banner without a request. In `auto` it starts `job update-install --auto
+  <version>` when the latest release is newer and not console-only, the router's local hour is 3, 4 or 5, the kill
+  switch does not block the router, and the attempts at that version allow it: one per night (20 h apart), three
+  at most, and none right after a check of this `due` failed (the install would ask the same GitHub again). After
+  three failures LuCI says that automatic updates stopped for that version; the next release starts over. The
+  install records its attempt on flash (`/etc/shadow-vpn/update.state`, written only when it changes) before any
+  download, so a reboot keeps the count; a run that a precondition (clock, space, memory, the kill switch) or its
+  own check stopped before that is recorded as a finished, failed attempt when it ends, so it too comes once a night
+  and three times at most, a transient cause (memory, GitHub's rate limit) included. `due` itself writes there only
+  one thing: an attempt still unfinished while no install runs (`due` holds the lock) was cut short by a reboot or
+  the OOM killer, so `due` marks it failed and raises `update_failed`, also when its version is installed (the run
+  skipped its wait for the tunnel and the rollback). An automatic install whose version is no longer the latest
+  stops quietly and records nothing, and the next `due` takes the newer one.
+- **Results.** `RUN/update.json` keeps the last check and the last install (`last`: from, to, changed, error,
+  automatic, rolled back), `RUN/update.run.json` the install in progress and its stage (`check`, `download`,
+  `install`, `finish`, `settle`, `rollback`), removed on every way out (the file of a run that was killed goes
+  with the next `due`, and LuCI never counts it: its pid no longer runs the updater). An install writes `last`
+  before it removes the run file, and rpcd's `update_status` looks at the run file before it reads `update.json`,
+  so an answer without a running install carries that install's result (LuCI stops polling on it). Every time kept
+  on tmpfs has an uptime twin, so LuCI's ages do not depend on the router clock (6.6). A successful install clears
+  `update_failed` and logs "Shadow was updated from X to Y." at level info (shown at the Detailed log level); a failed
+  one logs its error, and a failed automatic one raises `update_failed` with the version it is about and the
+  version installed then. The banners follow what is installed, whoever installed it: every install and every
+  `due` clear `update_available` once the installed version is the latest (also after a failed install that left the
+  new version), and `update_failed` once its version or a later one is installed and the installed version is no
+  longer the one the failure left (a failed rollback leaves the broken version installed: that banner stays).
+- **Lock.** `/var/lock/shadow-vpn-update.lock`, opened close-on-exec: the post-install that apk runs starts
+  detached daemons (busybox `start-stop-daemon -b` keeps descriptors above 2 open, lab), and an inherited lock
+  would stay taken for as long as they live. Only the entry points (`check`, `install`, `due`) take it, never the
+  work they do under it. While it is taken, `check` and a manual `install` say that an update is running, and
+  `due` and `install --auto` exit quietly and record nothing. `due` closes it before it starts the install job.
+  install.sh takes the same lock (11) and refuses while an update runs, so an install or `--uninstall` from the
+  console never meets one from LuCI or at night, whose `apk add` or rollback would put the packages back and turn
+  Shadow on again. The updater never takes Shadow's lock (6.1).
+- **Test hook.** With a base URL (env `SHADOW_BASE_URL`, else the contents of `RUN/update.base_url`, gone at a
+  reboot) the latest release is `<base>/release.json` with its files at `<base>/<file>`, and the release of tag `T`
+  is `<base>/T/release.json` with `<base>/T/<file>`; `html_url` counts only under the base, and asset API URLs are
+  ignored. The lab serves its builds this way (12).
+
+**Compatibility.** The updater installed on a router, of whatever older version, installs every later release,
+and its own code, not the new release's, runs that upgrade; the new release's rpcd and updater then read what it
+wrote. So these stay compatible for good: the repository (`stansful/ssh-vpn-client-luci-app-shadow-ucode`), both
+URL shapes (the API's `releases/latest`, `releases/tags/<tag>` and `releases/assets/<id>`, and
+`releases/download/<tag>/<file>`), the release JSON fields it reads (`tag_name`, `html_url`, `published_at`,
+`body`, `assets[].name`/`url`/`size`/`digest`), the console marker line, the name and format of `SHA256SUMS`,
+`shadow-vpn.apk`, the files in `RUN` and on flash above, the job result and the lock path. The old updater also
+judges the new release's runtime once `apk add` is done, with its own code, so what it reads there stays too:
+`RUN/state.json` with the phase `connected`, xray's metrics at `127.0.0.1:12348/debug/vars` (`PORT_METRICS`) with
+`observatory.proxy.alive` (the outbound tag `proxy` as the observatory's subject), UCI `shadow-vpn.main.enabled` as
+`1`, the init script `/etc/init.d/shadow-vpn` with its procd service `shadow-vpn` (the updater compares and restarts
+whatever instances it has, whatever their names) and `RUN/active`; and apk's flags it runs (`--cache-dir`,
+`--cache-predownload`, `--allow-untrusted`, `--simulate`, `--no-network`, `fetch -o`, `del`) and the `Purging <name>
+(` lines of its dry run. `tests/unit/runtime/cases/update.uc` pins them (`update/compat`). Maintainer scripts must
+not kill `job` or `update` processes nor remove `RUN/update.*`: the updater that runs them is one of those processes.
+`tests/unit/packaging/install_test.sh` checks both sides against the published release (with the same
+`PUBLISHED_RELEASE=skip` rule as above): with this tree's build installed, `update check` finds the published
+version (or says that none is published yet) and the download step fetches and verifies the published tag's files
+through both paths; once the published release ships the updater, that updater installs this tree's build from a
+base URL. `tests/unit/release/assets_test.sh` checks that `SHA256SUMS` and `shadow-vpn.apk` stay release assets.
+
 ## 12. Testing
 
 - **Lab** (`tests/lab/`): Docker on an arm64 host, so the aarch64 rootfs runs natively: OrbStack on Apple Silicon,
@@ -986,8 +1167,22 @@ hardening for later.
   validation messages, list parser, and `nft -c -f` of every rendered variant (mode × transport × ipv6 ×
   router_traffic × gate state); `apply converge` and `teardown` for real in the throwaway container (the phase
   after an xray-only change in SSH mode, the NTP exemption, what a stop that is not an Off keeps and what Off
-  clears, our file left in a persistent confdir). `tests/unit/luci/check_views.mjs` also checks that every
-  backend message (collected from the sources) translates through the Russian catalog.
+  clears, our file left in a persistent confdir). The updater (11.1) runs against stubs of uclient-fetch (which,
+  like the real one, prints `HTTP error N` only without `-q`), apk (which, like apk 3.0.5, refuses a `--cache-dir`
+  that does not exist, and does dry runs, fetches and installs that exit 1 after they went through or went in only
+  in part), procd behind `ubus` and the init script (an instance keeps its pid until it is deleted), and df: the
+  version helpers, the release JSON, `SHA256SUMS` and the install set; every check result; an install with both
+  download paths, apk's arguments, every refusal and mismatch, a Shadow removed while the files download, the lock
+  (free again right after an apk whose post-install left a detached child), the run file gone after a failure and
+  stdout one JSON line; `due` in every mode (the banner once per version, the night window, one attempt a night and
+  three per version, also for attempts that a precondition stopped, none after its own failed check, an
+  interrupted attempt, never while blocked); the banners following what is installed; the wait for the tunnel
+  (the instances started again, a verdict that must hold for 10 s) with its rollback (the purged packages fetched
+  and put back offline, a partial install, Shadow turned off meanwhile); the order in which an install leaves its
+  files; and the names an older updater reads of a newer runtime (`update/compat`). The rpcd tests read `update_status` from fixture files and refuse
+  `update_check`/`update_install` while a live process runs the updater. `tests/unit/luci/check_views.mjs` also
+  checks that every backend message (collected from the sources, the updater's included) translates through the
+  Russian catalog.
 - **Lab scenario checks:** `tests/lab/e2e-shadow.sh [install] [stage1]` builds, serves `out/` from a throwaway
   container on the lab WAN, runs `install.sh` with `SHADOW_BASE_URL`, then checks the main paths: SSH (password and
   key) in split and full mode, every Xray link type, tunnel DNS, the direct list, `dns_upstream_leak`, Off/On with
@@ -1003,7 +1198,13 @@ hardening for later.
   router's data (and that the router offers no other), the six pages and their JS over HTTP from the LAN, the
   Russian catalog and the `/ubus` ACL; the sysupgrade keep list (`sysupgrade -l`, `-b`); install.sh refusing while
   the kill switch blocks the router (11); an upgrade to the next patch version; `install.sh --uninstall` and
-  `apk del` (packages gone, dnsmasq-full kept, DNS and DHCP fine) each followed by a reinstall that stays off. The
+  `apk del` (packages gone, dnsmasq-full kept, DNS and DHCP fine) each followed by a reinstall that stays off; and
+  updates from LuCI (`stage3.update`, 11.1): a newer build served in GitHub's shape through `RUN/update.base_url`,
+  checked and installed through the rpc (version, Shadow on and connected, `last.ok`, the lock free, config and
+  secrets unchanged, xray's instance started again, the success logged at level info), then `update install --auto`
+  of a build whose `xray-run` exits at once and that changes nothing else (so only the updater's restart runs it),
+  which puts the previous
+  version back and ends connected. The
   lab never shuts the router down gracefully: OpenWrt's `K90umount` remounts the Docker VM's shared cgroup2
   read-only (section 14).
 - **E2E** (lab, the full list): install with `install.sh` from a local file server; On/Off, restart, reload and
@@ -1031,9 +1232,11 @@ hardening for later.
   and its single file, pre-commit hooks that stage other files or fail, no push and no tags, other branches,
   detached HEAD, a branch behind origin, no origin); `release-state_test.sh` runs `release-state.sh` against a bare
   origin with tags and a curl stub for the GitHub API, and `tag_commit` (lightweight and annotated tags);
-  `release-notes_test.sh` the notes' previous tag and commit list; `assets_test.sh` checks that release.yml,
-  build-release.sh and install.sh name the same files, that the tag is plain X.Y.Z and that release.yml reads the
-  tag's commit with `tag_commit` like release-state.sh. They pass under macOS
+  `release-notes_test.sh` the notes' previous tag and commit list, and their last line `shadow-update: console`
+  exactly when `build/CONSOLE_UPDATE` names the version (11.1); `assets_test.sh` checks that release.yml,
+  build-release.sh and install.sh name the same files, that the files the updater requires (`SHA256SUMS`,
+  `shadow-vpn.apk`, 11.1) are among them, that the job writing the notes checks out `build/CONSOLE_UPDATE`, that the
+  tag is plain X.Y.Z and that release.yml reads the tag's commit with `tag_commit` like release-state.sh. They pass under macOS
   `/bin/bash` 3.2 (BSD tools), bash 5.2 in `ubuntu:24.04` (GNU) and bash 5.3 in `alpine:3.23` (busybox).
 - Every test is deterministic: no assertion races random jitter or a tight timer window.
 - Not testable in the lab: the 6.12 kernel and kmod loading, MT7981 hardware offload, Wi-Fi, real flash/RAM
@@ -1083,6 +1286,24 @@ shorter than 120 s; and `apk del` recording Shadow as off (11).
   tunnelled pattern is longer still.
 - A plain mKCP link means a server with the classic `mkcp-original` obfuscation (7.4); an xray 26 server without
   masks needs `fm` in its link.
+- The update check asks GitHub's API without a token, which allows 60 requests an hour per public address, shared
+  by everything behind it (a CGNAT, an office). Over the limit the check says so and `due` tries again about 3 hours
+  later (11.1).
+- In full mode with the kill switch, a dead tunnel blocks the router's own downloads: an update from LuCI then
+  needs Shadow off for a moment, as install.sh does, and automatic installs wait for the tunnel (11.1).
+- Automatic mode installs, unattended and as root, whatever the latest release of the repository contains: the
+  files are checked only against that release's own `SHA256SUMS` and GitHub's digests, with no signature yet (11).
+  Whoever can publish a release there can run code on every router in automatic mode.
+- `apk add` has no hard deadline: the updater never kills it, since apk may be in the middle of its transaction. A
+  hung apk keeps the update lock, and LuCI shows the install as running, until it ends or the router reboots. An
+  install that outlasts LuCI's 15-minute wait goes on: the page's poll reports how it ended and reloads when it
+  changed the packages.
+- Three failed automatic attempts at a version stop automatic installs of it, whatever the cause, also a passing
+  one (too little memory that night, GitHub's rate limit): counting only some causes would let a lasting one start
+  the install every hour of every night. The user updates by hand then, or the next release starts over (11.1).
+- The rollback brings back what the upgrade purged and Shadow's own packages, from files fetched beforehand; a
+  dependency the new version upgraded stays upgraded, and one the old version needs in an older version than the
+  feeds now have makes the offline rollback fail (reported, `update_failed`).
 
 ## 14. Review log
 

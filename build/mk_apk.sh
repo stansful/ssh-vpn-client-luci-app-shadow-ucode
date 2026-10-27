@@ -75,6 +75,7 @@ shadow-vpn/files/etc/init.d/shadow-vpn
 shadow-vpn/files/etc/uci-defaults/80-shadow-vpn
 shadow-vpn/files/usr/libexec/shadow-vpn/apply
 shadow-vpn/files/usr/libexec/shadow-vpn/lists
+shadow-vpn/files/usr/libexec/shadow-vpn/update
 luci-app-shadow-vpn/root/usr/share/luci/menu.d/luci-app-shadow-vpn.json
 luci-app-shadow-vpn/root/usr/share/rpcd/acl.d/luci-app-shadow-vpn.json
 luci-app-shadow-vpn/root/usr/share/rpcd/ucode/luci.shadow-vpn
@@ -88,16 +89,22 @@ done
 
 # Package-specific maintainer script parts, appended to OpenWrt's generated headers like a
 # Makefile's Package/<name>/postinst, /prerm and /postrm. Nothing runs when building an image
-# (IPKG_INSTROOT set). The cron line is installed once here, not on every start (flash wear).
+# (IPKG_INSTROOT set). The cron lines are installed once here, not on every start (flash wear).
 
 cat > "$B/shadow-vpn.postinst-pkg" <<'EOF'
 [ -n "${IPKG_INSTROOT}" ] || {
 	# the fw4 include and the chain-pre accept rule take effect only after a reload
 	fw4 -q reload 2>/dev/null
-	cron_cmd="/usr/libexec/shadow-vpn/lists refresh due"
-	if ! crontab -c /etc/crontabs -l 2>/dev/null | grep -qF "$cron_cmd"; then
-		{ crontab -c /etc/crontabs -l 2>/dev/null; echo "23 * * * * $cron_cmd >/dev/null 2>&1"; } \
+	# each line on its own: an upgrade from a build that had only the lists line gains the update line
+	cron_added=
+	for cron_job in "23 /usr/libexec/shadow-vpn/lists refresh due" "47 /usr/libexec/shadow-vpn/update due"; do
+		cron_cmd="${cron_job#* }"
+		crontab -c /etc/crontabs -l 2>/dev/null | grep -qF "$cron_cmd" && continue
+		{ crontab -c /etc/crontabs -l 2>/dev/null; echo "${cron_job%% *} * * * * $cron_cmd >/dev/null 2>&1"; } \
 			| crontab -c /etc/crontabs -
+		cron_added=1
+	done
+	if [ -n "$cron_added" ]; then
 		# a stock image has an empty /etc/crontabs, so cron is not running yet
 		/etc/init.d/cron enable
 		/etc/init.d/cron restart
@@ -120,11 +127,12 @@ cat > "$B/shadow-vpn.prerm-pkg" <<'EOF'
 	# declared the instances again would register the service and its triggers once more, and procd
 	# would keep calling the removed files on every dhcp commit and WAN ifup until a reboot
 	[ -x /usr/libexec/shadow-vpn/apply ] && /usr/libexec/shadow-vpn/apply teardown --from-init
-	cron_cmd="/usr/libexec/shadow-vpn/lists refresh due"
-	if crontab -c /etc/crontabs -l 2>/dev/null | grep -qF "$cron_cmd"; then
-		crontab -c /etc/crontabs -l 2>/dev/null | grep -vF "$cron_cmd" | crontab -c /etc/crontabs -
-		[ -s /etc/crontabs/root ] || crontab -c /etc/crontabs -r 2>/dev/null
-	fi
+	for cron_cmd in "/usr/libexec/shadow-vpn/lists refresh due" "/usr/libexec/shadow-vpn/update due"; do
+		if crontab -c /etc/crontabs -l 2>/dev/null | grep -qF "$cron_cmd"; then
+			crontab -c /etc/crontabs -l 2>/dev/null | grep -vF "$cron_cmd" | crontab -c /etc/crontabs -
+			[ -s /etc/crontabs/root ] || crontab -c /etc/crontabs -r 2>/dev/null
+		fi
+	done
 	for s in $(uci -q show firewall | sed -n "s|^firewall\.\([^.]*\)\.path='/usr/libexec/shadow-vpn/fw4-hook'$|\1|p"); do
 		uci -q delete "firewall.$s"
 	done

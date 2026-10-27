@@ -144,6 +144,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             /build/VERSION
+            /build/CONSOLE_UPDATE
             /scripts/lib/
             /.github/scripts/
           sparse-checkout-cone-mode: false
@@ -153,7 +154,8 @@ jobs:
           name: release-${{ needs.gate.outputs.version }}
           path: release
 
-      # Russian first, then English: the install command and the commits since the previous release tag
+      # Russian first, then English: the install command and the commits since the previous release tag, and the
+      # console marker when build/CONSOLE_UPDATE names this version (DESIGN.md 11.1)
       - name: Write release notes
         run: |
           bash .github/scripts/release-notes.sh > "$RUNNER_TEMP/notes.md"

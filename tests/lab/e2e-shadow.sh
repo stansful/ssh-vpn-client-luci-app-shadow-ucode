@@ -97,15 +97,16 @@ poll() {
 	return 1
 }
 
-# job_wait <json from an rpc that returned { job }>: waits for the job; prints its final JSON
+# job_wait <json from an rpc that returned { job }> [seconds, default 90]: waits for the job; prints its final JSON
 job_wait() {
 	local id
 	id="$(printf '%s' "$1" | jq -r '.job // empty' 2>/dev/null)"
 	[ -n "$id" ] || { echo "no job: $1"; return 1; }
-	poll 90 job_done "$id"
+	poll "${2:-90}" job_done "$id"
 	rpc job_status "{\"id\":\"$id\"}"
 }
-job_done() { [ "$(rpc job_status "{\"id\":\"$1\"}" | jq -r .state)" != running ]; }
+# done or failed: a call that fails is no answer (rpcd re-executes itself while an update installs)
+job_done() { case "$(rpc job_status "{\"id\":\"$1\"}" | jq -r .state 2>/dev/null)" in done | failed) return 0 ;; esac; return 1; }
 
 applied_gen() { R "cat $RUN/applied 2>/dev/null" | tr -d '\n'; }
 converged_since() { local g; g="$(applied_gen)"; [ -n "$g" ] && [ "$g" != "$1" ]; }
@@ -198,7 +199,9 @@ lab_ready() {
 	fi
 }
 
-# pkgsrv_start [dir]: serves the packages of <dir> (default out/) and install.sh at $BASE_URL
+# pkgsrv_start [dir]: serves the packages of <dir> (default out/) and install.sh at $BASE_URL. For the updater
+# (stage3_update) also <dir>/release.json and the tag directories <dir>/X.Y.Z/ where they exist: the base URL
+# layout of DESIGN.md 11 (<base>/release.json and <base>/<name> for the latest release, <base>/<tag>/... for a tag).
 pkgsrv_start() {
 	local dir="${1:-$TREE/out}"
 	docker rm -f "$PKGSRV" >/dev/null 2>&1
@@ -209,7 +212,9 @@ pkgsrv_start() {
 			exec nginx -g "daemon off;"' >/dev/null || return 1
 	# streamed, not bind-mounted: OrbStack bind mounts may show a stale copy of a fresh build (and the package
 	# server needs no path the Docker host shares)
-	(cd "$dir" && COPYFILE_DISABLE=1 tar -cf - SHA256SUMS ./*.apk) | docker exec -i "$PKGSRV" tar -xf - -C /srv || return 1
+	# shellcheck disable=SC2046 # the names ls finds, none with a space
+	(cd "$dir" && COPYFILE_DISABLE=1 tar -cf - SHA256SUMS ./*.apk $(ls -d release.json [0-9]*.[0-9]*.[0-9]* 2>/dev/null)) |
+		docker exec -i "$PKGSRV" tar -xf - -C /srv || return 1
 	docker exec -i "$PKGSRV" sh -c 'cat > /srv/install.sh' < "$TREE/install.sh" || return 1
 	poll 15 R "wget -q -O /dev/null $BASE_URL/SHA256SUMS"
 }
@@ -1299,7 +1304,7 @@ LAB_SECRETS="ssh.pw trojan.pw hy2.pw uuid"
 LUCI_METHODS="attention_dismiss check hostkey_forget hostkey_pin job_status key_delete key_save key_show keys leases list_refresh \
 list_set list_view lists logs profile_delete profile_link profile_pin profile_rename profiles profiles_delete_unpinned \
 profiles_import rule_add rule_delete rule_set rules rules_export rules_import select server_delete server_save servers \
-set_enabled settings_set status "
+set_enabled settings_set status update_check update_install update_status "
 
 # same <name> <want> <got>: exact equality, and <want> must not be empty
 same() { if [ -n "$2" ] && [ "$2" = "$3" ]; then ok "$1"; else nok "$1" "want '$2', got '$3'"; fi; }
@@ -1387,6 +1392,65 @@ power_cycle() {
 etc_sums() { R 'cd / && md5sum etc/config/shadow-vpn $(find etc/shadow-vpn -type f | sort)'; }
 etc_secret_sums() { R 'cd / && md5sum $(find etc/shadow-vpn -type f | sort)'; }
 
+REPO="$(sed -n 's/^REPO=//p' "$TREE/install.sh")"
+UPDATE_LOCK=/var/lock/shadow-vpn-update.lock
+# the updater's record of its automatic attempts (flash), the one file under /etc/shadow-vpn an update may write
+UPDATE_AUTO=/etc/shadow-vpn/update.state
+
+host_sha256() { { sha256sum < "$1" 2>/dev/null || shasum -a 256 < "$1"; } | cut -c1-64; }
+
+# release_json <dir> <version>: <dir>/release.json in the shape of GitHub's release API, with the fields the updater
+# reads (tag_name, html_url, published_at, body, assets[].name/url/size/digest), for SHA256SUMS and the files it
+# lists. Under a base URL the updater keeps html_url only below that URL and takes every file from the base URL,
+# never from the assets' API urls.
+release_json() {
+	local dir="$1" v="$2" f n=0
+	for f in SHA256SUMS $(awk '{ print $2 }' "$dir/SHA256SUMS"); do
+		n=$((n + 1))
+		jq -n --arg name "$f" --arg url "https://api.github.com/repos/$REPO/releases/assets/$((900000 + n))" \
+			--argjson size "$(wc -c < "$dir/$f" | tr -d ' ')" --arg digest "sha256:$(host_sha256 "$dir/$f")" \
+			'{name: $name, url: $url, size: $size, digest: $digest, state: "uploaded"}'
+	done | jq -s --arg v "$v" --arg page "$BASE_URL/releases/tag/$v" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+		'{tag_name: $v, name: $v, html_url: $page, draft: false, prerelease: false, published_at: $at,
+		  body: "Lab release \($v).", assets: .}' > "$dir/release.json"
+}
+
+# broken_build <version> <out dir>: a build of this tree whose xray never starts (its xray-run exits at once), and
+# nothing else changed: its init script declares the same instances, so procd keeps the xray that runs over the
+# package's post-install, and only the updater's own restart of the instances (DESIGN.md 11.1) runs the new code.
+broken_build() {
+	local src rc
+	src="$(mktemp -d "${TMPDIR:-/tmp}/shv-e2e-broken.XXXXXX")" || return 1
+	cp -R "$TREE/build" "$TREE/shadow-vpn" "$TREE/luci-app-shadow-vpn" "$src/" &&
+		printf '#!/bin/sh\n# e2e-shadow.sh stage3 update: a broken build, its xray never starts\nexit 1\n' \
+			> "$src/shadow-vpn/files/usr/libexec/shadow-vpn/xray-run" &&
+		OUT="$2" "$src/build/mk_apk.sh" "$1"
+	rc=$?
+	rm -rf "$src"
+	return "$rc"
+}
+
+# Leftovers of an interrupted stage3_update, also its end: the package server, the base URL hook, the updater's
+# state (a new run builds the same versions: an announced version would raise no banner, an automatic attempt
+# would count on) and its banners, the log level it raised; cron runs again.
+update_cleanup() {
+	pkgsrv_stop
+	R "rm -rf $RUN/update.base_url $RUN/update.json $RUN/update.run.json $RUN/update.work $UPDATE_AUTO
+	   /etc/init.d/cron start" >/dev/null
+	rpc attention_dismiss '{"id":"update_available"}' >/dev/null
+	rpc attention_dismiss '{"id":"update_failed"}' >/dev/null
+	if [ "$(main_opt log_level)" != warning ]; then
+		set_main log_level=warning
+		poll 30 settled
+	fi
+}
+
+# the instance's pid in procd (empty while it does not run)
+instance_pid() { R "ubus call service list '{\"name\":\"shadow-vpn\"}'" | jq -r ".[\"shadow-vpn\"].instances.$1.pid // empty" 2>/dev/null; }
+
+# the update lock is free, no run file, no work dir
+update_idle() { R "flock -n $UPDATE_LOCK true && [ ! -e $RUN/update.run.json ] && [ ! -e $RUN/update.work ]"; }
+
 # check_lan_direct <what>: Shadow is off and the LAN works without it (DNS, the web directly)
 check_lan_direct() {
 	if poll 20 lan_dns_ok; then ok "$1: LAN DNS answers"; else nok "$1: LAN DNS answers" "no answer"; fi
@@ -1434,6 +1498,7 @@ stage3_setup() {
 		install_sh "$TREE/out"
 		check "stage3: Shadow $v installed from out/" "rc=0" "$INSTALL_OUT"
 	fi
+	update_cleanup
 	if main_is enabled 1; then
 		enable false >/dev/null
 		poll 30 inactive
@@ -1446,7 +1511,7 @@ stage3_setup() {
 	direct_list off
 	v="{\"transport\":\"xray\",\"sid\":\"$(profile_sid lab-vless-kcp)\"}"
 	rpc select "$v" >/dev/null
-	set_main mode=proxy-all tunnel_dns=1 kill_switch=1 ipv6=0 router_traffic=1 ssh_udp=reject autostart=1
+	set_main mode=proxy-all tunnel_dns=1 kill_switch=1 ipv6=0 router_traffic=1 ssh_udp=reject autostart=1 update=notify
 	poll 30 settled
 	expect "stage3: boot marker installed" boot_marker
 	DHCP_BEFORE="$(dhcp_state)"
@@ -1503,7 +1568,7 @@ stage3_boot() {
 
 stage3_luci() {
 	echo "== stage3: LuCI: every rpc method with the router's real data, the pages over HTTP, Russian"
-	local out r sid ksid sel pins p p1 p2 n before after fp endpoint ru v js sess f link1 link2
+	local out r sid ksid sel pins p p1 p2 n before after fp endpoint ru v js sess f link1 link2 upid
 
 	if ! main_is enabled 1; then
 		r="$(enable true)"
@@ -1512,7 +1577,7 @@ stage3_luci() {
 	poll 90 tunnel_up || { nok "luci: Shadow connected first" "$(rpc status | jq -c '{phase,message}')"; return; }
 
 	# the methods the router offers are exactly the ones this group calls (a new one cannot go untested)
-	check "rpc: the router offers the 35 methods tested here" "$LUCI_METHODS" \
+	check "rpc: the router offers the 38 methods tested here" "$LUCI_METHODS" \
 		"$(R 'ubus -v list luci.shadow-vpn' | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | LC_ALL=C sort | tr '\n' ' ')"
 
 	# status
@@ -1664,6 +1729,34 @@ $link2" '{text: $t, source: "manual"}')")"
 	check "rpc settings_set: an unknown setting" "Unknown setting." "$(rpc settings_set '{"values":{"e2e":"1"}}' | jq -r .errors.e2e)"
 	same "rpc settings_set: the endpoint as before" "$endpoint" "$(main_opt check_endpoint)"
 
+	# update_status, update_check, update_install. Never against GitHub (stage3_update serves releases in the lab):
+	# here an update in progress makes both refuse. The base URL hook names the stopped package server, so even a
+	# job they started by mistake could not reach GitHub; cron is stopped meanwhile, as the hourly "update due"
+	# removes a run file it finds (it holds the lock, so no install runs).
+	v="$(installed_version)"
+	out="$(rpc update_status)"
+	check "rpc update_status: mode, the installed version, nothing running" "notify ${v%-r*} null" \
+		"$(printf '%s' "$out" | jq -r '"\(.mode) \(.installed) \(.running)"')"
+	check "rpc update_status: the router's time and zone" "true" \
+		"$(printf '%s' "$out" | jq -r '(.clock.time | test("^[0-2][0-9]:[0-5][0-9]$")) and (.clock.zone | type == "string" and length > 0)')"
+	check "rpc update_status: the check, last and automatic results are null or of their types" "true" \
+		"$(printf '%s' "$out" | jq -r '(.latest == null or (.latest | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))) and
+			(.checked_age == null or (.checked_age | type) == "number") and ([.last, .auto] | all(. == null or type == "object"))')"
+	R "/etc/init.d/cron stop; echo $BASE_URL > $RUN/update.base_url" >/dev/null
+	# a stand-in for the updater: its command line names it, it writes the run file the real one writes
+	docker exec -d shadow-router sh -c 'printf "{\"pid\":%d,\"stage\":\"download\",\"version\":\"%s\",\"auto\":false,\"started\":%d,\"started_up\":%d}\n" \
+		$$ "$1" "$(date +%s)" "$(cut -d. -f1 /proc/uptime)" > /var/run/shadow-vpn/update.run.json
+		i=0; while [ $i -lt 120 ]; do sleep 1; i=$((i + 1)); done' "$LIBEXEC/update" "$(next_version)"
+	poll 10 R "[ -s $RUN/update.run.json ]"
+	upid="$(R "cat $RUN/update.run.json" | jq -r '.pid // empty' 2>/dev/null)"
+	check "rpc update_status: an update in progress" "download $(next_version) false true" \
+		"$(rpc update_status | jq -r '.running | "\(.stage) \(.version) \(.auto) \(.age | type == "number")"')"
+	check "rpc update_check: refused while an update runs" "An update is already running." "$(rpc update_check | jq -r '.error // .job')"
+	check "rpc update_install: refused while an update runs" "An update is already running." "$(rpc update_install | jq -r '.error // .job')"
+	[ -n "$upid" ] && R "kill $upid" >/dev/null && poll 10 R "[ ! -e /proc/$upid ]"
+	check "rpc update_status: a run file whose updater is gone is no update in progress" "null" "$(rpc update_status | jq -r .running)"
+	R "rm -f $RUN/update.run.json $RUN/update.base_url; /etc/init.d/cron start" >/dev/null
+
 	# the pages from the LAN, like a browser: each view page, its JS is the packaged file, the Russian catalog
 	C 'rm -f /tmp/cj; curl -s -m 10 -c /tmp/cj -o /dev/null -d "luci_username=root&luci_password='"$ROOT_PW"'" http://192.168.77.1/cgi-bin/luci/' >/dev/null
 	for v in overview ssh xray routing log settings; do
@@ -1802,6 +1895,120 @@ stage3_uninstall() {
 	expect "reinstall after apk del: nothing of Shadow armed" R '! nft list table inet shadow_vpn >/dev/null 2>&1 && [ ! -e /var/run/shadow-vpn/active ]'
 }
 
+# Updates from LuCI (DESIGN.md 11): the lab package server serves releases in GitHub's shape, and the updater takes
+# them from there through the base URL hook RUN/update.base_url. Cron is stopped meanwhile: the hourly "update due"
+# takes the update lock, and a check or install that met it would be refused.
+stage3_update() {
+	echo "== stage3: updates: check and install through rpc (Shadow on), an automatic update rolled back"
+	local cur next broken dir auto before r out t0 id xpid
+
+	cur="$(installed_version)"
+	cur="${cur%-r*}"
+	[ -n "$cur" ] || { nok "update: Shadow is installed" "no shadow-vpn package"; return; }
+	next="${cur%.*}.$((${cur##*.} + 1))"
+	broken="${next%.*}.$((${next##*.} + 1))"
+	dir="$TREE/out/update"
+	auto="$TREE/out/update-auto"
+	update_cleanup
+	R '/etc/init.d/cron stop' >/dev/null
+	# the updater logs a successful install at level info ("Detailed"); the default level (warning) leaves it out
+	set_main log_level=info
+	poll 30 settled
+	shadow_on "update" || { update_cleanup; return; }
+
+	# the latest release: a build of the next version; the installed one under its tag, as GitHub keeps every release
+	rm -rf "$dir" "$auto"
+	if out="$(OUT="$dir" "$TREE/build/mk_apk.sh" "$next" 2>&1)"; then ok "update: build $next"; else nok "update: build $next" "$out"; update_cleanup; return; fi
+	release_json "$dir" "$next"
+	if [ "$cur" = "$(cat "$TREE/build/VERSION")" ]; then
+		mkdir -p "$dir/$cur" && cp "$TREE/out/SHA256SUMS" "$TREE"/out/*.apk "$dir/$cur/" && release_json "$dir/$cur" "$cur"
+	fi
+	expect "update: package server with release.json" pkgsrv_start "$dir"
+	R "echo $BASE_URL > $RUN/update.base_url" >/dev/null
+
+	# "Check now"
+	r="$(job_wait "$(rpc update_check)" 150)"
+	check "update: update_check through rpc finds $next" "done true $cur $next true false" \
+		"$(printf '%s' "$r" | jq -r '"\(.state) \(.result.ok) \(.result.installed) \(.result.latest) \(.result.available) \(.result.console) \(.result.error // "")"')"
+	out="$(rpc update_status)"
+	check "update: update_status after the check" "notify $cur $next true true null" \
+		"$(printf '%s' "$out" | jq -r '"\(.mode) \(.installed) \(.latest) \(.available) \(.check_ok) \(.running)"')"
+	same "update: the release page from release.json" "$BASE_URL/releases/tag/$next" "$(printf '%s' "$out" | jq -r .url)"
+	check "update: the release notes" "Lab release $next." "$(printf '%s' "$out" | jq -r .notes)"
+	check "update: the release date and the check's age" "number number" \
+		"$(printf '%s' "$out" | jq -r '"\(.published | type) \(.checked_age | type)"')"
+	check "update: the banner says so" "Shadow $next is available." \
+		"$(rpc status | jq -r '.attention[] | select(.code == "update_available") | .message')"
+
+	# "Update to $next": Shadow stays on, the tunnel comes back, settings and secrets stay
+	before="$(etc_sums)"
+	xpid="$(instance_pid xray)"
+	log_mark update
+	t0=$(now_ms)
+	r="$(job_wait "$(rpc update_install)" 600)"
+	measure "update: update_install job (Shadow on)" "$(($(now_ms) - t0)) ms"
+	check "update: update_install through rpc updates $cur to $next" "done true true $cur $next" \
+		"$(printf '%s' "$r" | jq -r '"\(.state) \(.result.ok) \(.result.changed) \(.result.from) \(.result.to) \(.result.error // "")"')"
+	same "update: $next-r1 is installed" "$next-r1" "$(installed_version)"
+	check "update: Shadow stayed on" "1" "$(main_opt enabled)"
+	if poll 60 tunnel_up; then ok "update: connected, tunnel alive"; else nok "update: connected, tunnel alive" "$(rpc status | jq -c '{phase,message,tunnel}')"; fi
+	check "update: LAN traffic tunnelled" "$TUNNEL_SRC" "$(curl_c http://tunnel.shadow.lab/)"
+	out="$(rpc update_status)"
+	check "update: update_status.last is this update" "true true $cur $next false" \
+		"$(printf '%s' "$out" | jq -r '.last | "\(.ok) \(.changed) \(.from) \(.to) \(.auto)"')"
+	check "update: update_status: $next installed, nothing newer, nothing running" "$next false null" \
+		"$(printf '%s' "$out" | jq -r '"\(.installed) \(.available) \(.running)"')"
+	expect "update: the update lock is free, its run file and work dir gone" update_idle
+	same "update: config, secrets, keys, known_hosts and trust unchanged (md5)" "$before" "$(etc_sums)"
+	if has_attention update_available; then nok "update: the banner is gone" "$(rpc status | jq -c .attention)"; else ok "update: the banner is gone"; fi
+	check "update: the log says so (level info)" "Shadow was updated from $cur to $next." "$(since_mark "$LOG_MARK" | grep -F "Shadow was updated" | tail -1)"
+	# the same render: procd kept xray over the package's post-install, so the updater started it again itself
+	out="$(instance_pid xray)"
+	if [ -n "$xpid" ] && [ -n "$out" ] && [ "$xpid" != "$out" ]; then ok "update: xray runs the new code (its instance started again)"
+	else nok "update: xray runs the new code (its instance started again)" "pid $xpid before, '$out' after"; fi
+	same "update: rpc status reports the new version" "$next-r1" "$(status_field .versions.shadow)"
+
+	# An automatic update (what the hourly "update due" starts at night: job update-install --auto <version>) to a
+	# build whose xray never starts: the tunnel does not come back, so the updater installs $next again from the files
+	# it downloaded before it changed anything (<base>/$next/), and Shadow connects again
+	if out="$(broken_build "$broken" "$auto" 2>&1)"; then ok "update auto: build $broken, its xray never starts"
+	else nok "update auto: build $broken, its xray never starts" "$out"; update_cleanup; return; fi
+	release_json "$auto" "$broken"
+	mkdir -p "$auto/$next" && cp "$dir/SHA256SUMS" "$dir"/*.apk "$dir/release.json" "$auto/$next/"
+	expect "update auto: package server with $broken, and $next under its tag" pkgsrv_start "$auto"
+	before="$(etc_sums | grep -vF " ${UPDATE_AUTO#/}")"
+	t0=$(now_ms)
+	id="$(R "$LIBEXEC/job update-install --auto $broken" | tail -1)"
+	if ! printf '%s' "$id" | grep -qxE '[0-9]+-[0-9]+'; then nok "update auto: job update-install --auto $broken" "$id"; update_cleanup; return; fi
+	r="$(job_wait "{\"job\":\"$id\"}" 600)"
+	measure "update auto: install, the tunnel not back, rollback, connected" "$(($(now_ms) - t0)) ms"
+	check "update auto: the update failed and was rolled back" "failed false false true" \
+		"$(printf '%s' "$r" | jq -r '"\(.state) \(.result.ok) \(.result.changed) \(.result.rolled_back)"')"
+	same "update auto: ...and says so" "Shadow $broken was installed, but the tunnel did not come back, so Shadow $next was put back." \
+		"$(printf '%s' "$r" | jq -r '.result.error')"
+	same "update auto: $next-r1 is installed again" "$next-r1" "$(installed_version)"
+	same "update auto: the working xray-run is back" "$(host_md5 "$TREE/shadow-vpn/files/usr/libexec/shadow-vpn/xray-run")" \
+		"$(R "md5sum < $LIBEXEC/xray-run" | cut -c1-32)"
+	if poll 90 tunnel_up; then ok "update auto: Shadow is on and connected again"
+	else nok "update auto: Shadow is on and connected again" "$(rpc status | jq -c '{enabled,phase,message,tunnel}')"; fi
+	check "update auto: LAN traffic tunnelled" "$TUNNEL_SRC" "$(curl_c http://tunnel.shadow.lab/)"
+	out="$(rpc update_status)"
+	check "update auto: update_status.last is the rolled back attempt" "false false true true" \
+		"$(printf '%s' "$out" | jq -r '.last | "\(.ok) \(.changed) \(.rolled_back) \(.auto)"')"
+	check "update auto: update_status.auto: one finished attempt at $broken, not stopped yet" "$broken 1 true false false" \
+		"$(printf '%s' "$out" | jq -r '.auto | "\(.version) \(.tries) \(.finished) \(.ok) \(.stopped)"')"
+	same "update auto: the banner says why it failed" \
+		"The automatic update to $broken failed: Shadow $broken was installed, but the tunnel did not come back, so Shadow $next was put back." \
+		"$(rpc status | jq -r '.attention[] | select(.code == "update_failed") | .message')"
+	expect "update auto: the attempt is recorded on flash, for root only" R "[ \"\$(ls -l $UPDATE_AUTO | cut -c1-10)\" = -rw------- ]"
+	expect "update auto: the update lock is free, its run file and work dir gone" update_idle
+	same "update auto: config, secrets, keys, known_hosts and trust unchanged (md5)" "$before" "$(etc_sums | grep -vF " ${UPDATE_AUTO#/}")"
+
+	update_cleanup
+	# a build that breaks the tunnel is nothing to keep in out/
+	rm -rf "$auto"
+}
+
 stage3_mock() {
 	echo "== stage3: no design mock on the router; the LuCI files are the packaged ones"
 	local f
@@ -1843,6 +2050,8 @@ stage3() {
 	stage3_blocked
 	stage3_upgrade
 	stage3_uninstall
+	# after uninstall: out/ is installed again, the version the update builds on
+	stage3_update
 	stage3_mock
 	stage3_end
 }

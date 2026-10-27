@@ -3,7 +3,7 @@
 // LuCI area: the rpcd plugin against contract stubs (tests/unit/luci/stubs), the ACL, the menu and the catalogs.
 // The plugin uses the default UCI directory, so /etc/config/shadow-vpn is backed up and restored around the run.
 
-import { readfile, writefile, unlink, access, mkdir } from 'fs';
+import { readfile, writefile, unlink, access, mkdir, readlink } from 'fs';
 import { cursor } from 'uci';
 
 const SRC = '/src';
@@ -14,13 +14,15 @@ const ROOT = '/tmp/shv-luci';
 const ETC = ROOT + '/etc', RUN = ROOT + '/run';
 const UCI_FILE = '/etc/config/shadow-vpn';
 const LEASES = '/tmp/dhcp.leases';
+const APK_DB = ROOT + '/apk-installed';
+const UPDATE_STATE = RUN + '/update.json', UPDATE_RUN = RUN + '/update.run.json', UPDATE_AUTO = ETC + '/update.state';
 
 const CONTRACT = [
 	'status', 'set_enabled', 'select', 'servers', 'server_save', 'server_delete', 'hostkey_pin', 'hostkey_forget',
 	'keys', 'key_save', 'key_delete', 'key_show', 'profiles', 'profiles_import', 'profile_rename', 'profile_pin',
 	'profile_delete', 'profiles_delete_unpinned', 'profile_link', 'lists', 'list_set', 'list_refresh', 'list_view',
 	'rules', 'rule_add', 'rule_set', 'rule_delete', 'rules_import', 'rules_export', 'leases', 'check', 'job_status',
-	'logs', 'attention_dismiss'
+	'logs', 'attention_dismiss', 'update_status', 'update_check', 'update_install'
 ];
 const IMPORTS = [ 'const', 'config', 'secrets', 'state', 'links', 'validate', 'lists', 'keys' ];
 
@@ -81,6 +83,9 @@ function setup() {
 
 	sh(`cp ${FIX}/shadow-vpn.config ${UCI_FILE}`);
 	sh(`cp ${FIX}/job ${ROOT}/libexec/job && chmod 755 ${ROOT}/libexec/job`);
+	// versions() keeps the database until its mtime changes: written once, before the first call
+	writefile(APK_DB, 'C:Q1x=\nP:luci-app-shadow-vpn\nV:0.1.5-r1\n\nP:shadow-vpn\nV:0.1.5-r1\nA:all\n\n' +
+		'P:xray-core\nV:26.3.27-r1\n\nP:openssh-client\nV:10.6_p1-r1\n\n');
 	writefile(LEASES, '1792900000 a4:83:e7:11:22:33 192.168.1.120 MacBook 01:a4:83:e7:11:22:33\n' +
 		'1792900000 3c:22:fb:1a:0e:77 192.168.1.140 * *\n' +
 		'1792900000 3C:22:FB:1A:0E:77 192.168.1.140 dup *\n' +
@@ -378,6 +383,84 @@ function run_tests(m) {
 	check('luci: attention_dismiss removes the entry', call('attention_dismiss', { id: 'a1' }).ok && length(call('status').attention) == 0);
 }
 
+/* Updates: the updater's files as the plugin reads them; checks and installs are jobs (DESIGN §11) */
+
+function uptime() {
+	return int(split(readfile('/proc/uptime'), ' ')[0]);
+}
+
+// A live process whose command line names the updater, as the detached install's does.
+function fake_updater() {
+	sh(`sh -c 'sleep 30; exit 0' /usr/libexec/shadow-vpn/update >/dev/null 2>&1 & echo $! > ${ROOT}/updater.pid`);
+
+	return int(trim(readfile(`${ROOT}/updater.pid`) ?? '0'));
+}
+
+function update_tests(m) {
+	const call = (name, args) => m[name].call({ args: args ?? {} });
+	let u = call('update_status');
+
+	check('luci: update_status before any check', u.mode == 'notify' && u.installed == '0.1.5' && u.latest == null &&
+		u.available === false && u.checked_age == null && u.running == null && u.last == null && u.auto == null &&
+		match(u.clock?.time ?? '', /^[0-2][0-9]:[0-5][0-9]$/) && type(u.clock?.zone) == 'string', sprintf('%J', u));
+
+	const up = uptime();
+
+	writefile(UPDATE_STATE, sprintf('%J', {
+		checked: time() - 7200, checked_up: up - 30, ok: false, error: 'Could not reach GitHub to check for updates.',
+		installed: '0.1.5', latest: '0.1.6', tag: 'v0.1.6', url: 'https://github.com/stansful/x/releases/tag/v0.1.6',
+		published: 1792886400, notes: 'Fixes.', console: false, announced: '0.1.6', from_a_newer_writer: [ 1 ],
+		last: { ok: false, changed: true, from: '0.1.4', to: '0.1.5', auto: true, rolled_back: false, at: 1, at_up: up - 60,
+			error: 'Shadow 0.1.5 was installed, but the tunnel did not come back within 90 s.' }
+	}));
+	writefile(UPDATE_AUTO, sprintf('%J', { version: '0.1.6', tries: 3, at: time(), finished: true, ok: false, error: 'x' }));
+	u = call('update_status');
+	check('luci: update_status reads the last check, the last install and the automatic attempts',
+		u.latest == '0.1.6' && u.available === true && u.check_ok === false &&
+		u.check_error == 'Could not reach GitHub to check for updates.' && u.checked_age >= 30 && u.checked_age < 40 &&
+		u.url == 'https://github.com/stansful/x/releases/tag/v0.1.6' && u.published == 1792886400 && u.notes == 'Fixes.' &&
+		u.console === false && u.last?.changed === true && u.last?.auto === true && u.last?.from == '0.1.4' &&
+		u.last?.age >= 60 && u.last?.age < 70 && index(u.last?.error ?? '', 'did not come back') > 0 &&
+		u.auto?.version == '0.1.6' && u.auto?.stopped === true, sprintf('%J', u));
+
+	writefile(UPDATE_STATE, sprintf('%J', { latest: '0.1.5', url: 'javascript:alert(1)', console: 'yes', last: 'x' }));
+	writefile(UPDATE_AUTO, sprintf('%J', { version: '0.1.6', tries: 2, finished: true, ok: false }));
+	u = call('update_status');
+	check('luci: update_status tolerates odd fields and links only a web address',
+		u.latest == '0.1.5' && u.available === false && u.url == null && u.console === false && u.last == null &&
+		u.checked_age == null && u.auto?.stopped === false, sprintf('%J', u));
+
+	writefile(UPDATE_STATE, '{ not json');
+	writefile(UPDATE_AUTO, '[ 1 ]');
+	u = call('update_status');
+	check('luci: update_status survives damaged files', u.latest == null && u.auto == null && u.installed == '0.1.5', sprintf('%J', u));
+
+	uci_set('main', 'update', 'auto');
+	check('luci: update_status reports the mode', call('update_status').mode == 'auto');
+
+	// a run file whose pid runs something else (here: this test) is a leftover, not a running update
+	writefile(UPDATE_RUN, sprintf('%J', { pid: int(readlink('/proc/self')), stage: 'install', version: '0.1.6', started: time() }));
+	clear_jobs_log();
+	check('luci: a stale run file is no running update', call('update_status').running == null);
+	check('luci: update_check and update_install start their jobs',
+		call('update_check').job && call('update_install').job && jobs_log() == 'update-check\nupdate-install\n', jobs_log());
+
+	const pid = fake_updater();
+
+	writefile(UPDATE_RUN, sprintf('%J', { pid, stage: 'download', version: '0.1.6', auto: false, started: time(),
+		started_up: uptime() - 5 }));
+	clear_jobs_log();
+	u = call('update_status');
+	check('luci: update_status sees the install in progress', u.running?.stage == 'download' &&
+		u.running?.version == '0.1.6' && u.running?.auto === false && u.running?.age >= 5, sprintf('%J pid %d', u.running, pid));
+	check('luci: update_check and update_install are refused while an update runs',
+		call('update_check').error == 'An update is already running.' &&
+		call('update_install').error == 'An update is already running.' && jobs_log() == '', jobs_log());
+
+	sh(`kill ${pid}`);
+	unlink(UPDATE_RUN);
+}
+
 /* The transport follows the first server or profile set up while Shadow is off (DESIGN §10) */
 
 // A new install's config: no servers or profiles, Shadow off, transport ssh.
@@ -534,6 +617,7 @@ try {
 
 	check('luci: the plugin compiles', type(m) == 'object');
 	run_tests(m);
+	update_tests(m);
 	transport_tests(m);
 	static_checks(m);
 }

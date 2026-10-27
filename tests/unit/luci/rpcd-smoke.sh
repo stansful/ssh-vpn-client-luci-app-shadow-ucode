@@ -92,7 +92,7 @@ waitjob() {
 
 ubus list $O >/dev/null 2>&1 && pass "rpcd registers $O" || { fail "rpcd registers $O" "$(logread | grep -i rpcd | tail -5)"; exit 1; }
 n=$(ubus -v list $O | grep -c '"')
-[ "$n" -ge 35 ] && pass "rpcd lists $n methods" || fail "rpcd method list" "$(ubus -v list $O)"
+[ "$n" -ge 38 ] && pass "rpcd lists $n methods" || fail "rpcd method list" "$(ubus -v list $O)"
 
 expect status '' '@.phase' 'returns a phase'
 expect status '' '@.memory.total_kb' 'reports memory'
@@ -204,6 +204,43 @@ job=$(echo "$out" | jsonfilter -e '@.job')
 out=$(call set_enabled '{"enabled":false}')
 job=$(echo "$out" | jsonfilter -e '@.job')
 [ -n "$job" ] && pass "set_enabled false -> job $job ($(waitjob "$job"))" || fail 'set_enabled false' "$out"
+
+# Updates, never against GitHub: the check reads a release that uhttpd serves through the base-URL test hook, and
+# the install stops before any download (these files were not installed by apk, so no Shadow version is known)
+expect update_status '' '@.mode' 'reports the update mode'
+expect update_status '' '@.clock.time' 'reports the router clock'
+mkdir -p /www/shv-release
+echo '{"tag_name":"v9.9.9","name":"9.9.9","html_url":"http://127.0.0.1/shv-release/","published_at":"2026-10-01T00:00:00Z","body":"Smoke release.","assets":[]}' \
+	> /www/shv-release/release.json
+echo 'http://127.0.0.1/shv-release' > /var/run/shadow-vpn/update.base_url
+job=$(call update_check | jsonfilter -e '@.job')
+if [ -n "$job" ]; then
+	st=$(waitjob "$job")
+	[ "$st" = done ] && pass "update_check job $job finished" || fail "update_check job $job" "$st $(call job_status "{\"id\":\"$job\"}")"
+else
+	fail update_check "$(call update_check)"
+fi
+out=$(call update_status)
+[ "$(echo "$out" | jsonfilter -e '@.latest')" = 9.9.9 ] && [ -n "$(echo "$out" | jsonfilter -e '@.checked_age')" ] &&
+	pass 'update_status reports the checked release' || fail 'update_status reports the checked release' "$out"
+job=$(call update_install | jsonfilter -e '@.job')
+if [ -n "$job" ]; then
+	st=$(waitjob "$job")
+	out=$(call job_status "{\"id\":\"$job\"}")
+	[ "$st" = failed ] && [ "$(echo "$out" | jsonfilter -e '@.result.error')" = 'The installed Shadow version is unknown.' ] &&
+		pass 'update_install stops without a known installed version' || fail 'update_install without a known version' "$st $out"
+else
+	fail update_install "$(call update_install)"
+fi
+# an install in progress: a live process that runs the updater, named in the run file
+sh -c 'sleep 60; exit 0' /usr/libexec/shadow-vpn/update >/dev/null 2>&1 &
+upid=$!
+echo "{\"pid\":$upid,\"stage\":\"download\",\"version\":\"9.9.9\",\"auto\":false,\"started\":$(date +%s)}" > /var/run/shadow-vpn/update.run.json
+expect update_status '' '@.running.stage' 'sees the install in progress'
+expect update_check '' '@.error' 'is refused while an update runs'
+expect update_install '' '@.error' 'is refused while an update runs'
+kill $upid
+rm -rf /var/run/shadow-vpn/update.run.json /var/run/shadow-vpn/update.base_url /www/shv-release
 
 expect profile_delete "{\"sid\":\"$pid\"}" '@.ok' 'deletes a profile'
 expect server_delete "{\"sid\":\"$sid\"}" '@.ok' 'deletes the server'

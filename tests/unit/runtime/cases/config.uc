@@ -17,7 +17,7 @@ eq('config/good: main', m.main, {
 	enabled: true, autostart: false, transport: 'xray', ssh_server: 's_0123456789ab', xray_profile: 'p_0123456789ab',
 	mode: 'selected-rules', kill_switch: false, check_endpoint: 'example.com:8443', check_after_connect: false,
 	ssh_udp: 'direct', tunnel_dns: false, ipv6: true, dns_redirect: false, router_traffic: false,
-	lists_refresh: 12, log_level: 'info'
+	lists_refresh: 12, log_level: 'info', update: 'auto'
 });
 eq('config/good: lists', m.lists, { proxy: { enabled: true }, direct: { enabled: false } });
 eq('config/good: no errors', m.errors, []);
@@ -58,10 +58,12 @@ let b = load(cursor(`${U}/bad`));
 eq('config/bad: main falls back to defaults', b.main, {
 	enabled: false, autostart: true, transport: 'ssh', ssh_server: null, xray_profile: null, mode: 'proxy-all',
 	kill_switch: true, check_endpoint: 'youtube.com:443', check_after_connect: true, ssh_udp: 'reject',
-	tunnel_dns: true, ipv6: false, dns_redirect: true, router_traffic: true, lists_refresh: 24, log_level: 'warning'
+	tunnel_dns: true, ipv6: false, dns_redirect: true, router_traffic: true, lists_refresh: 24, log_level: 'warning',
+	update: 'notify'
 });
 
-for (let opt in [ 'enabled', 'transport', 'mode', 'kill_switch', 'lists_refresh', 'check_endpoint', 'ssh_server', 'log_level' ])
+for (let opt in [ 'enabled', 'transport', 'mode', 'kill_switch', 'lists_refresh', 'check_endpoint', 'ssh_server', 'log_level',
+	'update' ])
 	ok(`config/bad: main.${opt} reported`, length(errors_for(b, 'main', opt)) == 1, sprintf('%J', errors_for(b, 'main', null)));
 
 eq('config/bad: only the server with a bad keepalive survives', map(b.servers, (s) => [ s.sid, s.keepalive ]),
@@ -95,8 +97,8 @@ let e = load(cursor(`${U}/empty`));
 
 eq('config/empty: defaults', [ e.main.enabled, e.main.autostart, e.main.kill_switch, e.main.mode, e.main.tunnel_dns,
 	e.main.ipv6, e.main.dns_redirect, e.main.router_traffic, e.main.lists_refresh, e.main.log_level, e.main.check_endpoint,
-	e.main.ssh_udp ],
-	[ false, true, true, 'proxy-all', true, false, true, true, 24, 'warning', 'youtube.com:443', 'reject' ]);
+	e.main.ssh_udp, e.main.update ],
+	[ false, true, true, 'proxy-all', true, false, true, true, 24, 'warning', 'youtube.com:443', 'reject', 'notify' ]);
 eq('config/empty: no errors', e.errors, []);
 
 // the dnsmasq instance serving the LAN and its confdir

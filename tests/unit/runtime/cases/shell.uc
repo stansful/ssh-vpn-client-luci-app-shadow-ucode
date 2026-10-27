@@ -12,7 +12,8 @@ const SHELL = [
 	[ 'usr/libexec/shadow-vpn/xray-run', '#!/bin/sh' ],
 	[ 'usr/libexec/shadow-vpn/fw4-hook', '#!/bin/sh' ]
 ];
-const UCODE = [ 'usr/libexec/shadow-vpn/apply', 'usr/libexec/shadow-vpn/job', 'usr/libexec/shadow-vpn/tunnel-check' ];
+const UCODE = [ 'usr/libexec/shadow-vpn/apply', 'usr/libexec/shadow-vpn/job', 'usr/libexec/shadow-vpn/tunnel-check',
+	'usr/libexec/shadow-vpn/update' ];
 
 // a trailing comment on the shebang breaks it on Linux (lab)
 for (let f in SHELL) {

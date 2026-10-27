@@ -34,6 +34,7 @@ NTP_DEADLINE=30
 
 TUNNEL_WAIT=15              # seconds to wait for xray's first tunnel probe
 METRICS_URL=http://127.0.0.1:12348/debug/vars
+UPDATE_LOCK=/var/lock/shadow-vpn-update.lock
 
 DEPS="xray-core openssh-client dnsmasq-full"
 PACKAGES="shadow-vpn luci-app-shadow-vpn luci-i18n-shadow-vpn-ru"
@@ -95,6 +96,17 @@ run_with_deadline() {
 
 check_root() {
 	[ "$(id -u)" = 0 ] || die "Запустите установщик от root." "Run the installer as root."
+}
+
+# The router's own updater (DESIGN.md 11.1) installs under this lock: an install, upgrade or removal from here never
+# runs in the middle of one from LuCI or at night, which would put its packages back or turn Shadow on again after
+# it. fd 9 holds it in this shell only (main runs the work with 9>&-).
+take_update_lock() {
+	mkdir -p "${UPDATE_LOCK%/*}"
+	exec 9>>"$UPDATE_LOCK"
+	flock -n 9 ||
+		die "Shadow сейчас обновляется (из LuCI или автоматически ночью). Подождите несколько минут и запустите команду снова." \
+			"Shadow is being updated right now (from LuCI or automatically at night). Wait a few minutes and run the command again."
 }
 
 check_release() {
@@ -478,10 +490,14 @@ main() {
 	check_root
 	trap cleanup EXIT
 	trap 'exit 130' INT TERM HUP
+	take_update_lock
+	# busybox start-stop-daemon -b keeps descriptors above 2 open, and the package scripts start detached jobs: a
+	# child that inherited fd 9 would hold the update lock for as long as it lives. The redirection closes 9 for
+	# every command of the action, and the shell keeps the lock through the close-on-exec copy it saves meanwhile.
 	if [ "$action" = uninstall ]; then
-		do_uninstall
+		do_uninstall 9>&-
 	else
-		do_install
+		do_install 9>&-
 	fi
 }
 

@@ -5,7 +5,7 @@
 			"ubus": {
 				"luci.shadow-vpn": [
 					"status", "servers", "keys", "profiles", "lists", "list_view", "rules", "rules_export",
-					"leases", "job_status", "logs"
+					"leases", "job_status", "logs", "update_status"
 				]
 			},
 			"uci": [ "shadow-vpn" ]
@@ -18,7 +18,8 @@
 					"key_save", "key_delete", "key_show",
 					"profiles_import", "profile_rename", "profile_pin", "profile_delete", "profiles_delete_unpinned", "profile_link",
 					"list_set", "list_refresh",
-					"rule_add", "rule_set", "rule_delete", "rules_import"
+					"rule_add", "rule_set", "rule_delete", "rules_import",
+					"update_check", "update_install"
 				]
 			},
 			"uci": [ "shadow-vpn" ]

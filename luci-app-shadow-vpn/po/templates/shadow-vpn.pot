@@ -1061,7 +1061,7 @@ msgid "%s (from the OpenWrt feed)"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/shadow-vpn/settings.js:79
-msgid "Update"
+msgid "Update from the console"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/shadow-vpn/ssh.js:71
@@ -2345,4 +2345,268 @@ msgstr ""
 
 #: htdocs/luci-static/resources/view/shadow-vpn/routing.js
 msgid "The “Blocked in Russia” list is not downloaded yet. Shadow turns on anyway and downloads it through the tunnel; until then nothing goes through the tunnel."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Updates"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Only when I check"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Check daily and show a notice"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Install automatically at night"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Except in “Only when I check”, the router asks GitHub for the latest Shadow release once a day. An automatic update starts between 03:00 and 06:00 router time, downloads only from the project’s GitHub releases, checks the files against SHA256SUMS, restarts the tunnel for a few seconds and puts the previous version back if the tunnel does not come back."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Router time now: %s (%s)."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Could not read the update status."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Retry"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Installed version"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Latest release"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Release notes"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgctxt "update"
+msgid "Not checked yet."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Last check"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Last update"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgctxt "update"
+msgid "Updated"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgctxt "update"
+msgid "Failed"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "automatically"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "previous version put back"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Installing Shadow %s…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Installing an update…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Checking the latest release."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Downloading and verifying the files."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Installing the packages."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Finishing the installation."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Waiting for the tunnel to come back."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Putting the previous version back."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Shadow stopped installing %s automatically after %d failed attempts. Update by hand or wait for the next release."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Check now"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Update to %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Update Shadow?"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Shadow %s will be downloaded from GitHub and installed. The tunnel restarts for a few seconds and the page reloads."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Shadow is already up to date."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Shadow was updated to %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "Update available"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/shadow-vpn/overview.js
+msgid "Automatic update failed"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "%s The tunnel is down, and Shadow’s kill switch may be what blocks the download."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "Not enough space on the router: %s MB free, %s MB needed."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "Not enough free memory: %s MB available, %s MB needed."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "Could not download %s from GitHub."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "The latest release has no %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "SHA256SUMS has no entry for %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "The checksum of %s does not match SHA256SUMS: the file is damaged or was replaced."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "The size of %s does not match the release."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "GitHub lists another checksum for %s than SHA256SUMS."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+#: htdocs/luci-static/resources/view/shadow-vpn/settings.js
+msgid "Shadow %s must be installed with the install command from the console."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "The package manager could not install the update: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "The package manager did not install Shadow %s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "Shadow %s was installed, but the tunnel did not come back within %s s."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "Shadow %s was installed, but the tunnel did not come back, so Shadow %s was put back."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "Shadow %s was installed, but the tunnel did not come back, and putting Shadow %s back failed: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "The packages of the installed Shadow %s could not be downloaded for a rollback, so it was not updated automatically."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "Shadow %s is available."
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "The automatic update to %s failed: %s"
+msgstr ""
+
+#: htdocs/luci-static/resources/shadow-vpn/common.js
+msgid "The automatic update to %s was interrupted."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "No Shadow release is published yet."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "GitHub refused the request: too many requests from this address. Try again in an hour."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "Could not reach GitHub to check for updates."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "GitHub returned a release that Shadow cannot read."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "Shadow is already checking for or installing an update. Try again in a minute."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "An update is already running."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "Could not take the update lock."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "The router clock is wrong, so HTTPS does not work. Check time synchronization in System → System."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "The installed Shadow version is unknown."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "Shadow blocks the router’s own downloads while its tunnel is down (kill switch). Turn Shadow off, update, then turn it back on."
+msgstr ""
+
+#. Backend message (rpcd plugin, update.uc, update)
+msgid "SHA256SUMS is malformed."
 msgstr ""

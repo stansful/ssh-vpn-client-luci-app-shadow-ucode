@@ -22,7 +22,8 @@ let m = load(cursor());
 eq('uci_defaults: the defaults of DESIGN.md 5', m.main, {
 	enabled: false, autostart: true, transport: 'ssh', ssh_server: null, xray_profile: null, mode: 'proxy-all',
 	kill_switch: true, check_endpoint: 'youtube.com:443', check_after_connect: true, ssh_udp: 'reject',
-	tunnel_dns: true, ipv6: false, dns_redirect: true, router_traffic: true, lists_refresh: 24, log_level: 'warning'
+	tunnel_dns: true, ipv6: false, dns_redirect: true, router_traffic: true, lists_refresh: 24, log_level: 'warning',
+	update: 'notify'
 });
 eq('uci_defaults: both lists, off', m.lists, { proxy: { enabled: false }, direct: { enabled: false } });
 eq('uci_defaults: config has no errors', m.errors, []);

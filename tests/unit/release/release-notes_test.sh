@@ -98,5 +98,23 @@ check "only a release commit since the last tag" 'line "Изменения с 0.
 rn VERSION=v0.2.0
 check "a malformed VERSION is refused" '[ $RC = 1 ]'
 
+# The console marker (DESIGN.md 11.1): update.uc refuses a release whose body has a line that is exactly
+# `shadow-update: console` (CONSOLE_RE /(^|\n)shadow-update: console(\n|$)/, after it removed CR)
+marker() { printf '%s\n' "$OUT" | grep -cx 'shadow-update: console'; }
+rn
+check "no build/CONSOLE_UPDATE: no console marker" '[ $RC = 0 ] && [ "$(marker)" = 0 ] && ! printf "%s" "$OUT" | grep -q "shadow-update"'
+printf '0.2.0\n' >"$REPO/build/CONSOLE_UPDATE"
+rn
+check "build/CONSOLE_UPDATE names this version: the last line is the marker, once, as update.uc reads it" \
+	'[ $RC = 0 ] && [ "$(marker)" = 1 ] && [ "$(printf "%s\n" "$OUT" | tail -n 1)" = "shadow-update: console" ] && ! printf "%s" "$OUT" | grep -q "$(printf "\r")"'
+check "...with a line that says so in Russian and English" 'printf "%s\n" "$OUT" | grep -q "Эту версию обновление из LuCI не устанавливает" && printf "%s\n" "$OUT" | grep -q "Updates from LuCI do not install this version"'
+printf ' 0.2.0 \r\n' >"$REPO/build/CONSOLE_UPDATE"
+rn
+check "...also with blanks and CRLF around the version" '[ "$(marker)" = 1 ]'
+printf '0.1.9\n' >"$REPO/build/CONSOLE_UPDATE"
+rn
+check "a CONSOLE_UPDATE left from another release marks nothing" '[ $RC = 0 ] && [ "$(marker)" = 0 ]'
+rm -f "$REPO/build/CONSOLE_UPDATE"
+
 echo "# $pass passed, $fail failed"
 [ "$fail" = 0 ]

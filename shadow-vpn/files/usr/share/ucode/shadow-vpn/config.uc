@@ -8,7 +8,7 @@ const MAIN_DEFAULTS = {
 	enabled: false, autostart: true, transport: 'ssh', ssh_server: null, xray_profile: null,
 	mode: 'proxy-all', kill_switch: true, check_endpoint: CHECK_ENDPOINT, check_after_connect: true,
 	ssh_udp: 'reject', tunnel_dns: true, ipv6: false, dns_redirect: true, router_traffic: true,
-	lists_refresh: 24, log_level: 'warning'
+	lists_refresh: 24, log_level: 'warning', update: 'notify'
 };
 
 const MAIN_BOOLS = [ 'enabled', 'autostart', 'kill_switch', 'check_after_connect', 'tunnel_dns', 'ipv6',
@@ -18,7 +18,8 @@ const MAIN_ENUMS = {
 	transport: [ 'ssh', 'xray' ],
 	mode: [ 'proxy-all', 'selected-rules' ],
 	ssh_udp: [ 'reject', 'direct' ],
-	log_level: [ 'info', 'warning', 'error' ]
+	log_level: [ 'info', 'warning', 'error' ],
+	update: [ 'manual', 'notify', 'auto' ]
 };
 
 const BOOL_WORDS = { '1': true, 'on': true, 'true': true, 'yes': true, 'enabled': true,

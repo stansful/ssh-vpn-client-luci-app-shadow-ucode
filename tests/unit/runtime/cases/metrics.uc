@@ -25,7 +25,7 @@ if (access(RUN) || listening(12348)) {
 mkdir('/var/run', 0o755);
 mkdir(RUN, 0o700);
 
-eq('metrics/nothing listens: unknown', state.tunnel_health(), { alive: null, fallback: null, delay_ms: null });
+eq('metrics/nothing listens: unknown', state.tunnel_health(), { alive: null, fallback: null, delay_ms: null, answered: false, probed: false });
 
 writefile(`${RUN}/fallback`, 'direct\n');
 run(`mkdir -p ${WWW}/debug`);
@@ -43,17 +43,18 @@ for (let i = 0; i < 50 && !listening(12348); i++)
 
 if (ok('metrics/stand-in listens', listening(12348))) {
 	serve({ cmdline: [ 'xray', 'run' ], observatory: { proxy: { alive: true, delay: 42, outbound_tag: 'proxy' } } });
-	eq('metrics/alive, with its delay', state.tunnel_health(), { alive: true, fallback: 'direct', delay_ms: 42 });
+	eq('metrics/alive, with its delay', state.tunnel_health(),
+		{ alive: true, fallback: 'direct', delay_ms: 42, answered: true, probed: true });
 
 	// protobuf JSON leaves out alive=false
 	serve({ observatory: { proxy: { outbound_tag: 'proxy', last_error_reason: 'io: read/write on closed pipe' } } });
-	eq('metrics/dead tunnel', state.tunnel_health(), { alive: false, fallback: 'direct', delay_ms: null });
+	eq('metrics/dead tunnel', state.tunnel_health(), { alive: false, fallback: 'direct', delay_ms: null, answered: true, probed: true });
 
 	serve({ cmdline: [ 'xray', 'run' ], memstats: { Alloc: 1 } });
-	eq('metrics/not probed yet', state.tunnel_health(), { alive: null, fallback: 'direct', delay_ms: null });
+	eq('metrics/not probed yet', state.tunnel_health(), { alive: null, fallback: 'direct', delay_ms: null, answered: true, probed: false });
 
 	serve('{ "observatory": ');
-	eq('metrics/cut-off body', state.tunnel_health(), { alive: null, fallback: 'direct', delay_ms: null });
+	eq('metrics/cut-off body', state.tunnel_health(), { alive: null, fallback: 'direct', delay_ms: null, answered: false, probed: false });
 }
 
 run(`kill ${pid}`);

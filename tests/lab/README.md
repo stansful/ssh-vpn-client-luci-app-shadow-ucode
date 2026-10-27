@@ -15,8 +15,9 @@ PRINT_FIRMWARE=1 ./up.sh        # version=, file=, sha256= of the firmware image
                                 # only on a lab without Shadow installed: it binds the same ports (12345, 12346)
 ./e2e-shadow.sh                 # Shadow itself: build, install.sh from a lab package server, scenario checks
 ./e2e-shadow.sh stage2          # failure handling (about 5 min; install + stage1 + stage2 about 6 min)
-./e2e-shadow.sh stage3          # restart/reload, power cuts, LuCI, keep list, blocked install, upgrade, uninstall
-                                # (install + stage1 + stage2 + stage3 on a fresh lab: about 8 min)
+./e2e-shadow.sh stage3          # restart/reload, power cuts, LuCI, keep list, blocked install, upgrade, uninstall,
+                                # updates (install + stage1 + stage2 + stage3 on a fresh lab: about 8 min before the
+                                # update group, which adds a few minutes)
 ./down.sh                       # remove lab containers + networks (label com.shadow.testenv=1); images kept
 ```
 
@@ -28,8 +29,10 @@ PRINT_FIRMWARE=1 ./up.sh        # version=, file=, sha256= of the firmware image
 ./e2e-shadow.sh stage2           # failure handling, on what is installed
 ./e2e-shadow.sh stage2.ssh       # one group of stage2 (killswitch_xray, fallback_xray, xray_crash, quic,
                                  # routing_edits, both_sets, port_forward, dnsmasq, ssh, heal, end)
-./e2e-shadow.sh stage3           # boot, LuCI, keep list, blocked install, upgrade, removal (about 1.5 min)
-./e2e-shadow.sh stage3.boot      # one group of stage3 (boot, luci, keep, blocked, upgrade, uninstall, mock, end)
+./e2e-shadow.sh stage3           # boot, LuCI, keep list, blocked install, upgrade, removal (about 1.5 min), and
+                                 # updates (two builds, a 90 s wait before the rollback: a few minutes more)
+./e2e-shadow.sh stage3.boot      # one group of stage3 (boot, luci, keep, blocked, upgrade, uninstall, update, mock,
+                                 # end)
 SKIP_BUILD=1 ./e2e-shadow.sh     # install out/ as it is
 ```
 
@@ -57,11 +60,17 @@ SKIP_BUILD=1 ./e2e-shadow.sh     # install out/ as it is
 * `stage3`: the life cycle around Shadow. Groups: `boot` (`/etc/init.d/shadow-vpn restart` and `reload` keep it
   connected; power cuts with `autostart=1`, an Off cut short before its teardown, `autostart=0`), `luci` (every rpc
   method with the router's data, the six pages and their JS from the LAN, the Russian catalog, the `/ubus` ACL, and
-  that the router offers exactly the methods tested), `keep` (`sysupgrade -l`/`-b`), `blocked` (install.sh while
+  that the router offers exactly the methods tested; the update methods only see an update in progress, a stand-in
+  process, and never reach GitHub), `keep` (`sysupgrade -l`/`-b`), `blocked` (install.sh while
   Shadow is on with the kill switch in full mode and the VPN server is blocked: it stops before any download with the
   Russian/English hint), `upgrade` (a build of the next patch version into `out/upgrade/`), `uninstall`
   (`install.sh --uninstall` and `apk del`: packages, data plane and the procd service with its triggers gone, each
-  followed by a reinstall that stays off), `mock` (no design mock left,
+  followed by a reinstall that stays off), `update` (the updater against releases the package server serves in
+  GitHub's shape, `release.json` and `<tag>/`, through the hook `/var/run/shadow-vpn/update.base_url`, cron stopped
+  meanwhile, log level info for the success line: Check now and Update through rpc with Shadow on, xray's instance
+  started again by the updater, then `job update-install --auto` of a build whose `xray-run` exits at once and that
+  changes nothing else, so procd keeps the running xray and only the updater's restart of the instances runs it,
+  which must roll back to the version before and connect again), `mock` (no design mock left,
   LuCI files are the packaged ones), `end`. A lab-only `/etc/init.d/zz-e2e-boot` (the last S99) marks the end of a
   boot. It ends with Shadow installed and **off** and dnsmasq's settings as before it.
 * Reboots are power cuts (`docker kill` + `docker start`): see the K90umount gotcha below.

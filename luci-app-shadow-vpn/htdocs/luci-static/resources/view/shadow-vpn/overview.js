@@ -51,6 +51,8 @@ function attentionTitle(a) {
 	case 'dns_upstream_leak': return _('DNS lookups bypass the tunnel');
 	case 'dns_bootstrap': return _('Some DNS servers depend on the tunnel');
 	case 'nft_rejected': return _('The firewall rejected Shadow’s rules');
+	case 'update_available': return _('Update available');
+	case 'update_failed': return _('Automatic update failed');
 	default: return _('Attention');
 	}
 }
@@ -463,12 +465,18 @@ return view.extend({
 		case 'dns_bootstrap':
 			actions.push(el('a', { class: 'btn cbi-button', href: L.url('admin/network/dhcp') }, [ _('DHCP and DNS') ]));
 			break;
+
+		case 'update_available':
+		case 'update_failed':
+			actions.push(pageLink(_('Settings'), 'settings'));
+			break;
 		}
 
 		actions.push(common.button(_('Dismiss'), null, () =>
 			common.api.attentionDismiss(a.id).then(() => this.refresh()).catch(err => common.fail(err))));
 
-		const cls = (a.code in { ssh_fatal: 1, xray_config: 1, port_busy: 1, dns_rejected: 1, nft_rejected: 1 }) ? 'error' : 'warning';
+		const cls = (a.code in { ssh_fatal: 1, xray_config: 1, port_busy: 1, dns_rejected: 1, nft_rejected: 1 }) ? 'error'
+			: (a.code == 'update_available') ? 'info' : 'warning';
 
 		return banner(cls, attentionTitle(a), common.tr(a.message), actions, a.id);
 	},

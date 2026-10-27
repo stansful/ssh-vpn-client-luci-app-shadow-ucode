@@ -24,6 +24,7 @@ set_default dns_redirect 1
 set_default router_traffic 1
 set_default lists_refresh 24
 set_default log_level warning
+set_default update notify
 
 for list in proxy direct; do
 	uci -q get "shadow-vpn.$list" >/dev/null && continue

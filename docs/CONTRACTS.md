@@ -22,11 +22,13 @@ ssh-vpn-client-luci-app-shadow-ucode/                              (repository r
       apply job gate-set xray-run fw4-hook tunnel-check            owner: runtime
       ssh-run ssh-up ssh-askpass ssh-hostkey ssh-classify          owner: ssh
       lists                                                        owner: routing
+      update                                                       owner: packaging (the updater, DESIGN.md §11.1)
     files/usr/share/ucode/shadow-vpn/
       const.uc config.uc secrets.uc state.uc xray.uc               owner: runtime
       links.uc                                                     owner: links
       validate.uc lists.uc routing.uc                              owner: routing
       ssh.uc keys.uc                                               owner: ssh
+      update.uc                                                    owner: packaging
   luci-app-shadow-vpn/                                             owner: luci
     htdocs/luci-static/resources/view/shadow-vpn/{overview,ssh,xray,routing,log,settings}.js
     htdocs/luci-static/resources/shadow-vpn/common.js
@@ -64,7 +66,39 @@ export const LIST_URLS = {
 export const LIMITS = { profiles: 1000, rules: 10000, list_domains: 20000, download_bytes: 2097152,
 	import_chars: 2097152, import_lines: 2000, link_chars: 65536 };
 export const SID_RE = /^[skpr]_[0-9a-f]{12}$/;   // s_ server, k_ key, p_ profile, r_ rule
+export const REPO = 'stansful/ssh-vpn-client-luci-app-shadow-ucode';
+export const APK_DB = '/lib/apk/db/installed';        // rpcd versions() and update.uc read it
+export const UPDATE = {                                // the updater, DESIGN §11.1
+	api: `https://api.github.com/repos/${REPO}/releases`,      // + '/latest' or '/tags/<tag>'
+	download: `https://github.com/${REPO}/releases/download`,  // + '/<tag>/<file>': pinned to the checked release
+	asset_api: `https://api.github.com/repos/${REPO}/releases/assets/`, // asset url = this + digits
+	page: `https://github.com/${REPO}/releases/`,              // html_url kept only with this prefix
+	state: `${RUN}/update.json`,          // tmpfs: last check, last install result, banner
+	run: `${RUN}/update.run.json`,        // tmpfs: the install in progress
+	work: `${RUN}/update.work`,           // tmpfs work dir (0700), removed before and after
+	base_url: `${RUN}/update.base_url`,   // tmpfs test hook (lab): used when env SHADOW_BASE_URL is unset
+	auto: `${ETC}/update.state`,          // flash: automatic attempts (survive reboots), written only on change
+	lock: '/var/lock/shadow-vpn-update.lock',
+	interval: 86400, retry: 10800, slack: 600,   // due: re-check after interval (ok) / retry (failed), minus slack
+	window: [ 3, 6 ],                     // automatic installs start at local hours 3, 4, 5
+	attempt_gap: 72000, max_tries: 3,     // one automatic attempt per version per night, at most 3 per version
+	fetch_ms: 60000, total_ms: 300000, tries: 3, pause: 3, check_ms: 90000, // per attempt / all downloads / check budget
+	json_max: 262144, file_max: 8388608,
+	apk_update_ms: 300000,
+	tunnel_wait: 15, settle: 90,          // seconds: first tunnel verdict (install.sh TUNNEL_WAIT) / tunnel back after install
+	stable: 10,                           // seconds the tunnel must stay back (consecutive polls) within settle
+	free_kb: 5120, mem_kb: 16384,         // install.sh NEED_FREE_UPGRADE_KB / NEED_MEM_UPGRADE_KB
+	clock_floor: 1792886400,              // install.sh CLOCK_FLOOR
+	notes_max: 4000
+};
 ```
+
+`REPO`, the URL shapes and the `state`, `run`, `auto` and `lock` paths fall under the updater's compatibility rule
+(DESIGN §11.1): an installed updater of any older version keeps using them to install the later releases. So do
+the parts of the runtime it reads after it installed a newer release: `RUN` and `RUN/state.json` with the phase
+`connected`, `RUN/active`, `PORT_METRICS` with xray's `/debug/vars` and `observatory.proxy.alive` (the observatory
+subject `proxy`), `UCI` with `main.enabled`, and `/etc/init.d/shadow-vpn` as a procd service named `shadow-vpn`
+(tests/unit/runtime/cases/update.uc `update/compat`).
 
 Detection target (owner, 2026-10-25): a dead tunnel is noticed in about 10 s. The observatory values above are the
 starting point; tune them in the lab and keep this file and DESIGN.md §6.7 in sync.
@@ -79,7 +113,8 @@ starting point; tune them in the lab and keep this file and DESIGN.md §6.7 in s
   main: { enabled, autostart, kill_switch, check_after_connect, tunnel_dns, ipv6, dns_redirect, router_traffic: bool,
           transport: 'ssh'|'xray', ssh_server: sid|null, xray_profile: sid|null,
           mode: 'proxy-all'|'selected-rules', check_endpoint: 'host:port', ssh_udp: 'reject'|'direct',
-          lists_refresh: int /* hours, 0 = manual */, log_level: 'info'|'warning'|'error' },
+          lists_refresh: int /* hours, 0 = manual */, log_level: 'info'|'warning'|'error',
+          update: 'manual'|'notify'|'auto' /* default 'notify', DESIGN §11.1 */ },
   lists: { proxy: { enabled: bool }, direct: { enabled: bool } },
   servers:  [ { sid, name, host, port: int, username, auth: 'password'|'key', key: sid|null,
                 fingerprint: 'SHA256:...'|'', keepalive: int, note } ],
@@ -231,8 +266,41 @@ render(model, ctx) -> { ok, config } | { ok: false, error }   // DESIGN §7.4; c
 // state.uc
 read() -> state     write(patch) -> state                       // RUN/state.json
 uptime() -> int                                                 // seconds since boot (since_up, ages)
-attention_add(code, message, extra?)  attention_dismiss(id)  attention_list()
+attention_add(code, message, extra?)  attention_dismiss(id)  attention_list()  attention_clear(code)
 job_write(id, patch)  job_read(id)
+tunnel_health(timeout_ms?) -> { alive: bool|null, fallback, delay_ms, answered: bool, probed: bool }
+	// answered: xray's metrics answered at all; probed: they had observatory.proxy. So "xray does not answer"
+	// (down) and "no probe yet" (wait) differ (the updater's kill-switch test, DESIGN §11.1)
+// update.uc (DESIGN §11.1). Every external command and system path comes from opts, with production defaults:
+// bin (a stub dir: tests), run (dir of the tmpfs files), etc (dir of the flash file), lock, db (APK_DB), base_url,
+// config / confdir, limits (over UPDATE), now, uptime, hour, mode, sleep(s), blocked(), connected(), spawn(version).
+// Children get </dev/null and their output in a work-dir file or /dev/null: stdout carries only the CLI's JSON.
+parse_version(s) -> [x, y, z]|null      // 'X.Y.Z', 'vX.Y.Z', 'X.Y.Z-rN'; no leading zeros (scripts/lib/version.sh)
+compare(a, b) -> -1|0|1|null            // null when either is not a version
+installed(opts) -> { version: 'X.Y.Z'|null, packages: { <name>: 'X.Y.Z-rN' } }
+	// from APK_DB: shadow-vpn and every package starting with luci-app-shadow-vpn or luci-i18n-shadow-vpn-
+release_info(text, base?) -> { version, tag, url, published: epoch|null, notes, console: bool,
+	assets: { <name>: { url, size, digest } } } | { error }
+	// text > json_max refused; tag_name must parse; url kept only under UPDATE.page (under a base URL: under the
+	// base); asset names ^[A-Za-z0-9._+-]+$, url only UPDATE.asset_api + digits (none under a base URL), size an
+	// int, digest only 'sha256:<64 hex>'; notes without CR, cut to notes_max at a line end; console: a body line
+	// exactly `shadow-update: console`
+parse_sums(text) -> { <name>: sha256 }|null   // every non-empty line `<64 hex>  <name>` (install.sh), else null
+install_set(sums, inst) -> { files: [names] } | { error }
+	// every *.apk in SHA256SUMS minus luci-* packages not installed now; shadow-vpn.apk required
+check(opts) -> { ok, installed, latest, available, console, error? }
+install(opts, auto?) -> { ok, changed, from, to, error?, rolled_back? }
+	// auto: the version due saw (--auto). Nothing newer, or a newer release than auto: { ok: true, changed: false,
+	// version } and nothing recorded. Busy: { ok: false, error }, or with auto { ok: true, changed: false,
+	// skipped: 'busy' }. Every other --auto run is an attempt in UPDATE.auto, also one that a precondition or its
+	// check stopped before any download. changed: Shadow's packages differ from before (apk's database decides,
+	// not its exit code); rolled_back: an automatic install put the previous version back (after a tunnel that did
+	// not come back within settle s, or a release that went in only in part). The wait for the tunnel restarts the
+	// procd instances that kept their pid over `apk add` (ubus service delete + the init script's start) and needs
+	// new pids, phase connected and tunnel_health().alive on consecutive polls over `stable` s
+due(opts) -> { ok, mode, checked?, available?, error?, spawned? } | { ok: true, skipped: 'busy' }
+	// check, install and due take UPDATE.lock themselves (a lock that cannot be opened: { ok: false, error });
+	// the work they do under it is internal and assumes the lock is held
 ```
 
 CLIs (all take the lock themselves unless noted):
@@ -243,8 +311,9 @@ CLIs (all take the lock themselves unless noted):
 | `apply teardown [--from-init]` | DESIGN §6.4 |
 | `apply render <dir> [--config <uci dir>]` | renders every file into `<dir>` without touching the system (unit/e2e tests) |
 | `gate-set` | recomputes the gate verdict (DESIGN §6.7); when the installed dnsmasq conf is not the verdict's variant it leaves `pending`, and the converge that follows installs it; `flock -n` |
-| `job <name> [args]` | detached (start-stop-daemon -b); names: `converge [--connect]`, `check [host:port]`, `list-refresh <proxy\|direct\|due>`, `wan-up`, `post-start <gen> [--check]`; prints the job id (`<monotonic s>-<ns>`) |
+| `job <name> [args]` | detached (start-stop-daemon -b); names: `converge [--connect]`, `check [host:port]`, `list-refresh <proxy\|direct\|due>`, `wan-up`, `post-start <gen> [--check]`, `update-check`, `update-install [--auto X.Y.Z]`; prints the job id (`<monotonic s>-<ns>`). The `update-*` jobs' result is `{ rc, ...json }` of the last non-empty line the updater printed |
 | `tunnel-check [host:port]` | DESIGN §10, prints the JSON result and writes `RUN/check.json` |
+| `update check \| install [--auto X.Y.Z] \| due` | DESIGN §11.1. Takes `UPDATE.lock` (close-on-exec, `xn`), never Shadow's lock; busy: `check` and `install` answer with an error, `install --auto` and `due` exit 0 quietly. Sets the log level from UCI and prints exactly one JSON line (the result of `check` / `install` / `due`) on stdout; exit 0 ok, 1 failure, 2 usage (the usage line on stderr, nothing on stdout). `due` closes the lock, then spawns `job update-install --auto <v>` |
 
 Internal entry points (one helper calls another; not for LuCI): `apply post-start <gen> [--check]` (the detached
 step 6 of DESIGN §6.3), `apply state <phase> [message] [code]` (xray-run's state writes), `apply xray-fatal <file>`
@@ -268,7 +337,12 @@ instances from `RUN` (apply calls it after every converge, outside its lock).
 	// (extra: { servers }), dns_bootstrap (extra: { servers, bootstrap }: full mode, resolvers the tunnel
 	// carries or none outside it), list_failed (id list_failed:<kind>, gone with the next good refresh of that
 	// list), rules_invalid; ssh_fatal and xray_config are cleared with RUN/fatal and RUN/xray.fatal (and ssh_fatal
-	// when a session comes up), not by other converges; Off clears every code of a run (DESIGN §6.4)
+	// when a session comes up), not by other converges; Off clears every code of a run (DESIGN §6.4).
+	// The updater's (DESIGN §11.1), which Off keeps: update_available ('Shadow %s is available.'; notify and auto
+	// modes, once per version; cleared when installed >= latest, by every install and due, and in manual mode),
+	// update_failed (extra: { version, installed }: the version the automatic install was about and the one
+	// installed when it failed or was found interrupted; cleared by a successful install, and once installed >=
+	// version while installed != extra.installed)
 // RUN/jobs/<id>.json
 { id, name, state: 'running'|'done'|'failed', started: epoch, finished: epoch|null, result: {} }
 // RUN/check.json
@@ -278,7 +352,24 @@ instances from `RUN` (apply calls it after every converge, outside its lock).
 	// sentence otherwise; message: the log line
 // RUN/gate: '' | 'accept'
 // RUN/patterns: JSON from routing.patterns()
+// RUN/update.json (UPDATE.state; state.write_json, read by rpcd)
+{ checked: epoch, checked_up: uptime, ok: bool|null, error: string|null, installed: 'X.Y.Z'|null, latest, tag, url,
+  published, notes, console: bool, announced: 'X.Y.Z'|null,
+  last: { ok, changed, from, to, error, auto: bool, rolled_back: bool|null, at: epoch, at_up: uptime } | null }
+	// latest … console come from the last successful check: a failed check keeps them; announced: the version
+	// update_available was raised for (tmpfs, so a reboot may show the banner once more); last: the last install
+	// that tried something (rolled_back null: no rollback was tried); one that finds nothing newer records nothing
+// RUN/update.run.json (UPDATE.run): the install in progress, rewritten at each stage, removed on every way out
+{ pid, stage: 'check'|'download'|'install'|'settle'|'rollback'|'finish', version, auto: bool, started: epoch,
+  started_up: uptime }
+// ETC/update.state (UPDATE.auto, flash, 0600, tmp + fsync + rename, written only when it changes)
+{ version, tries: int, at: epoch, finished: bool, ok: bool, error: string|null }   // the last automatic attempt
+	// written unfinished before the downloads, finished when the run ends; a run stopped before the downloads (a
+	// precondition, its check) is written once, finished. tries counts the attempts at that version
 ```
+
+The readers of the three update files tolerate fields they do not know and fields that are missing: the file may
+come from an updater of another version (DESIGN §11.1).
 
 Other files in `RUN` (all 0600 unless noted; runtime-internal): `table.open.nft` / `table.accept.nft` (the two gate
 variants; `table.nft` is a copy of the current one), `table.apply.nft` (the last transaction), `dnsmasq.conf` /
@@ -291,7 +382,10 @@ secret files of the selected server), `ssh.gen` (renewed when `ssh.stamp` change
 `SHADOW_GEN`; the ssh instance gets `<gen>.<ssh.gen>`), `applied` (the token of the last applied converge), `pending`, `active`,
 `flush.sets`, `patterns.applied`, `dnsmasq.restart` / `dnsmasq.hup` (post-start's to-do), `xray.down` (uptime when
 xray went away), `xray.quick` (`<quick exits> <last start> <tested>`), `xray.fatal`, `fatal`, `xray-watch.pid`,
-`pin.<sid>`, `next/` (the render being checked). The dnsmasq conf in the confdir is 0644, written through
+`pin.<sid>`, `next/` (the render being checked), `update.work/` (0700: the updater's downloads, apk cache and log,
+the rollback packages in `rollback/` and what the upgrade purges in `rollback/deps/`; removed before and after an
+install), `update.base_url` (the updater's test
+hook: a base URL used when `SHADOW_BASE_URL` is unset). The dnsmasq conf in the confdir is 0644, written through
 `.shadow-vpn.conf.tmp` (conf-dir skips dot files); one with our header there while `RUN/dnsmasq` is missing is a
 leftover that teardown removes. A `.shadow-vpn.servers` of earlier builds is removed from the confdir on sight.
 A teardown while Shadow stays on keeps `fatal`, `xray.fatal` and `ssh.stamp`.
@@ -319,6 +413,8 @@ All methods return quickly; anything slow returns `{ job }` and the view polls `
 | `logs` | `lines` | `{ lines: [string] }` (constant `logread` args; filter by tag in ucode) |
 | `attention_dismiss` | `id` | `{ ok }` |
 | `settings_set` | `values: { mode?, check_endpoint?, lists_refresh? }` | `{ ok } \| { errors: { field: message } }`; converges only when `mode` changed |
+| `update_status` | — | `{ mode, installed, latest, available, console, url, published, notes, checked_age, check_ok, check_error, running: { stage, version, auto, age } \| null, last: { ok, changed, from, to, error, auto, rolled_back, age } \| null, auto: { version, tries, ok, finished, error, stopped } \| null, clock: { time: 'HH:MM', zone } }` |
+| `update_check` / `update_install` | — / — | `{ job }` (`update-check` / `update-install`); `{ error: 'An update is already running.' }` while one runs |
 
 Writes made through the plugin are committed with the ucode `uci` cursor and followed by `job converge` (no
 `config.change` event is emitted for them). `set_enabled(true)` spawns `job converge --connect` when it turns Shadow
@@ -350,6 +446,16 @@ Additive fields beyond the table (the views rely on them; no field above is rena
 - `list_set(kind, true)` on a list that was never downloaded returns the `list-refresh <kind>` job (it converges
   itself); `check` returns `{ error }` while `RUN/active` is missing.
 - Secret reads (`key_show`, `profile_link`) are in the ACL's write group.
+- `update_status` (read group) reads `RUN/update.json`, `RUN/update.run.json`, `ETC/update.state` and `APK_DB` (as
+  `versions` in `status` does): `installed` is `X.Y.Z` or `null`; `available` comes from a version compare of the
+  plugin's own (it does not import `update.uc`); `checked_age` from `checked_up` (else `checked`), `running.age`
+  and `last.age` likewise from the uptime twins; `running` only while the run file's `pid` is a live process whose
+  `/proc/<pid>/cmdline` contains `/usr/libexec/shadow-vpn/update` (looked at before `RUN/update.json` is read: the
+  updater writes `last` before it removes the run file, so `running: null` comes with the final `last`);
+  `auto.stopped` is `tries >= max_tries` and not
+  `ok`; `clock.zone` is `system.@system[0].zonename`, else `timezone`, else `UTC`. Fields the files lack or do not
+  know are tolerated (an updater of another version may have written them). `update_check` and `update_install`
+  (write group) take no arguments: LuCI never picks the version, the updater installs the latest release.
 
 ## 10. Tests
 
@@ -358,21 +464,39 @@ Additive fields beyond the table (the views rely on them; no field above is rena
   (streamed in with tar, not bind-mounted: OrbStack bind mounts can serve a stale copy of a fresh file):
   `ucode -L /src/shadow-vpn/files/usr/share/ucode <test>`. Tests may run `nft -c -f`, `dnsmasq --test` and
   `xray run -test` there. A test prints `ok <name>` / `not ok <name>: <why>` and exits non-zero on failure.
+- The updater: `tests/unit/runtime/cases/update.uc` (in `runtime_test.uc`'s cases) runs `update.uc` and the CLI
+  against a stub uclient-fetch (serves fixture files by URL, records its argv, and prints `HTTP error N` and exits
+  8 only when called without `-q`, like the real one), a stub apk (records its argv, exits 99 for a `--cache-dir`
+  that does not exist as apk 3.0.5 does, can fail, exit 1 after installing or after a partial install, answer a
+  dry run with purged packages, fetch, and leave a detached `start-stop-daemon -S -b -x /bin/sleep -- 30` as a
+  post-install would), a stub `ubus` and init script that play procd (an instance keeps its pid until it is
+  deleted and declared again), a stub df and a stub fsync that records the order of the files an install leaves,
+  through `opts.bin` and the `opts` paths. `tests/unit/luci_test.uc` checks `update_status` from fixture files and an
+  `APK_DB` fixture, running detection with a live process whose cmdline names the updater, and the refusals while
+  it runs. `tests/unit/luci/rpcd-smoke.sh` and the lab's `LUCI_METHODS` know the three methods.
 - E2E runs in the lab (`tests/lab/`); only one agent drives it at a time. `tests/lab/e2e-shadow.sh [install]
   [stage1] …` installs the build the real way (install.sh with `SHADOW_BASE_URL` from a throwaway package server on
   the lab WAN) and runs the scenario checks of each stage (`stage1` main paths, `stage2` failure handling,
-  `stage2.<group>` one group of it, `stage3` boot/upgrade/removal/LuCI, `stage3.<group>` one group of it); it is
-  re-runnable on a lab from `up.sh`. Host-side docker tests outside run.sh: `tests/unit/ssh/e2e.sh`,
+  `stage2.<group>` one group of it, `stage3` boot/upgrade/removal/LuCI and updates from LuCI, `stage3.<group>` one
+  group of it); it is re-runnable on a lab from `up.sh`. Its package server also serves `release.json` in GitHub's
+  shape and per-tag subdirectories for the updater's base URL; only `stage3.update` runs `update_check` and
+  `update_install`, and never against the real GitHub. Host-side docker tests outside run.sh: `tests/unit/ssh/e2e.sh`,
   `tests/unit/luci/rpcd-smoke.sh`, `tests/unit/packaging/install_test.sh` (the factory rootfs: refusals, an
   unreachable source and one with no release, fresh install, `apk del` on the factory world, a new latest release
   during the download, upgrade, downgrade, `--uninstall`, and at the end the latest release published on GitHub,
   installed by this install.sh the way a router does, or "no release is published yet" while there is none;
-  `PUBLISHED_RELEASE=skip` skips that part, a release run that publishes a new version does). Like run.sh they copy sources and builds into their containers with tar, never through a bind
+  `PUBLISHED_RELEASE=skip` skips that part, a release run that publishes a new version does). It also checks the
+  updater's cron line (installed once, kept once by an upgrade and a reinstall, gained by an upgrade from the
+  published release that had only the lists line, removed by `apk del` and `--uninstall`) and, in the published
+  release part, `update check` against GitHub, the download step for the published tag through both paths, and,
+  once the published release ships `/usr/libexec/shadow-vpn/update`, its install of this tree's build from a base
+  URL. Like run.sh they copy sources and builds into their containers with tar, never through a bind
   mount. `node tests/unit/luci/check_views.mjs` compiles the views as LuCI does, checks their msgids against the
   template and that every backend message translates through the Russian catalog.
 - `tests/unit/release/run.sh` runs the release scripts' tests on the host (bash 3.2+ and git, no Docker):
   `make-release_test.sh`, `release-state_test.sh` (a curl stub for the GitHub API), `release-notes_test.sh`,
-  `assets_test.sh`; same `ok`/`not ok` output.
+  `assets_test.sh` (also: `SHA256SUMS` and `shadow-vpn.apk`, which the updater requires, are release assets); same
+  `ok`/`not ok` output.
 - All of it runs on any arm64 Docker host (OrbStack on Apple Silicon, a Linux arm64 machine) and in CI
   (`.github/workflows/ci.yml`: job `lint` on `ubuntu-24.04`, jobs `unit`, `host-docker` and `lab` on GitHub's
   `ubuntu-24.04-arm`). On a

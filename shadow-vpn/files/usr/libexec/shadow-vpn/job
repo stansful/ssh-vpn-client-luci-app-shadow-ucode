@@ -2,8 +2,8 @@
 'use strict';
 
 // job <name> [args]: runs a slow action detached (start-stop-daemon -b) and prints its id at once.
-// Names: converge [--connect], check [host:port], list-refresh <proxy|direct|due>, wan-up, post-start <gen> [--check].
-// The detached run writes RUN/jobs/<id>.json, which LuCI polls.
+// Names: converge [--connect], check [host:port], list-refresh <proxy|direct|due>, wan-up, post-start <gen> [--check],
+// update-check, update-install [--auto X.Y.Z]. The detached run writes RUN/jobs/<id>.json, which LuCI polls.
 
 import { readfile, open, unlink, access, glob, stat, popen } from 'fs';
 import { connect } from 'ubus';
@@ -16,6 +16,7 @@ const R = C.RUN, SELF = `${C.LIBEXEC}/job`, APPLY = `${C.LIBEXEC}/apply`;
 const SSH_LOG_CAP = 262144;
 const GEN = /^[0-9]{1,24}$/;
 const SSH_SID = /^s_[0-9a-f]{12}$/;
+const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 
 function q(s) {
 	return "'" + replace(`${s}`, "'", "'\\''") + "'";
@@ -39,6 +40,17 @@ function command(name, args) {
 
 	case 'wan-up':
 		return [];
+
+	case 'update-check':
+		return [ `${C.LIBEXEC}/update`, 'check' ];
+
+	case 'update-install':
+		// LuCI installs the latest release; only due names a version, the one it saw
+		if (!length(args))
+			return [ `${C.LIBEXEC}/update`, 'install' ];
+
+		return (length(args) == 2 && args[0] == '--auto' && match(args[1], VERSION)) ?
+			[ `${C.LIBEXEC}/update`, 'install', '--auto', args[1] ] : null;
 	}
 
 	return null;
@@ -147,6 +159,15 @@ function execute(id, name, args) {
 			}
 			catch (e) { }
 		}
+		else if (name == 'update-check' || name == 'update-install') {
+			// update prints one JSON line at the end; a run killed before it leaves only rc
+			let lines = filter(split(r.out, '\n'), (l) => trim(l) != '');
+
+			try {
+				result = { rc: r.rc, ...json(lines[length(lines) - 1]) };
+			}
+			catch (e) { }
+		}
 		else if (name == 'converge') {
 			let s = state.read();
 
@@ -168,7 +189,9 @@ function start(name, args) {
 
 	state.job_write(id, { name, state: 'running', started: time(), finished: null, result: {} });
 
-	// -b detaches into its own session and closes inherited descriptors (procd's and our locks)
+	// -b detaches into its own session but keeps inherited descriptors above 2 open (busybox), so the daemon
+	// would hold any lock its caller holds: callers open theirs close-on-exec ('ae') or close them first, and the
+	// init script closes procd's (1000>&-)
 	let rc = system([ 'start-stop-daemon', '-S', '-b', '-x', SELF, '--', '--run', id, name, ...args ]);
 
 	if (rc != 0) {

@@ -15,6 +15,7 @@ config shadow 'main'
 	option router_traffic '0'
 	option lists_refresh '12'
 	option log_level 'info'
+	option update 'auto'
 
 config list 'proxy'
 	option enabled '1'

@@ -182,7 +182,8 @@ const BACKEND = [
 	'shadow-vpn/files/usr/share/ucode/shadow-vpn/ssh.uc', 'shadow-vpn/files/usr/share/ucode/shadow-vpn/links.uc',
 	'shadow-vpn/files/usr/share/ucode/shadow-vpn/validate.uc', 'shadow-vpn/files/usr/share/ucode/shadow-vpn/keys.uc',
 	'shadow-vpn/files/usr/share/ucode/shadow-vpn/lists.uc', 'shadow-vpn/files/usr/share/ucode/shadow-vpn/state.uc',
-	'shadow-vpn/files/usr/share/ucode/shadow-vpn/xray.uc', 'luci-app-shadow-vpn/root/usr/share/rpcd/ucode/luci.shadow-vpn'
+	'shadow-vpn/files/usr/share/ucode/shadow-vpn/xray.uc', 'shadow-vpn/files/usr/share/ucode/shadow-vpn/update.uc',
+	'shadow-vpn/files/usr/libexec/shadow-vpn/update', 'luci-app-shadow-vpn/root/usr/share/rpcd/ucode/luci.shadow-vpn'
 ];
 // texts that never reach the page: the log line of a check (the page words the result itself)
 const NOT_SHOWN = [ /^Tunnel check succeeded for / ];

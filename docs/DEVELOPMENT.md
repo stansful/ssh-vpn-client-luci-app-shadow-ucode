@@ -61,7 +61,9 @@ GitHub's arm64 runners; a push to `master` is tested by `.github/workflows/relea
 Routers take `install.sh` from the default branch and the packages from the latest release, so the `install.sh` on
 the branch must install the current release: `install_test.sh` in CI installs the real release from GitHub with it,
 and while there is none, checks that the installer says so. Change the release's file names and the `SHA256SUMS`
-format only compatibly: GitHub serves the old `install.sh` from its cache for up to 5 minutes after a push.
+format only compatibly: GitHub serves the old `install.sh` from its cache for up to 5 minutes after a push, and the
+updater on every router, whatever its version, installs the new releases with its own old code (the full list of
+what must stay is in [section 11.1 of DESIGN.md](DESIGN.md#111-updates-from-luci)).
 
 ## Releases
 
@@ -79,6 +81,22 @@ included) and, when the version in `build/VERSION` has no release yet, builds th
 checked, then published as the latest release, which is where the installer takes the packages from. When the
 version is released already, the run ends with a hint to bump it. When the CI fails, nothing is released: re-run the
 failed jobs, or push a fix.
+
+A release that the updaters on the routers must not install (one that moves files between packages, merges or
+renames packages, or needs a LuCI package they would skip; the full rule is in
+[section 11.1 of DESIGN.md](DESIGN.md#111-updates-from-luci)) is marked before it is published: commit a file
+`build/CONSOLE_UPDATE` that holds its version, then make the release as usual.
+
+```bash
+echo 0.3.0 > build/CONSOLE_UPDATE && git add build/CONSOLE_UPDATE && git commit -m 'chore: 0.3.0 installs from the console'
+scripts/make-release.sh 0.3.0 --yes && git push
+```
+
+`.github/scripts/release-notes.sh` then ends the release notes with a line `shadow-update: console`, and the release
+is created and published with those notes, so no router sees it as the latest without the marker (an edit after
+publishing would come too late for the routers that checked meanwhile). Every updater refuses such a release and
+shows the install command instead; install.sh installs it. A `CONSOLE_UPDATE` that names another version marks
+nothing, so the file can stay for the next releases.
 
 A local release build is `scripts/build-release.sh` (what CI runs): the packages, `install.sh` and `SHA256SUMS` in
 `out/`; the files get the commit's time, so one commit gives the same files as its release.

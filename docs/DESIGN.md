@@ -399,16 +399,30 @@ Health and failover live inside xray, so no watcher process is needed:
 - All tunnelled inbounds (`tproxy-in`, `tproxy6-in`) and xray's internal DNS (`dns-internal`) route to a
   **balancer** `tunnel` with selector `proxy` and `fallbackTag` = `block` (kill switch, default) or `direct`.
 - `burstObservatory` pings `http://www.gstatic.com/generate_204` through `proxy` every 5 s (sampling 2,
-  timeout 3 s; target from the owner: a dead tunnel is noticed in about 10 s). xray spreads the probes at random over
+  timeout 4 s; target from the owner: a dead tunnel is noticed in about 10 s). xray spreads the probes at random over
   interval × sampling, so the lab measured 5–16 s from the server going away to the fallback, about 11 s typical
-  (7 s when the server refuses at once). When the pings succeed again it returns to `proxy` within about one
-  interval. Right after xray starts `tunnel.alive` is `null` (no probe yet), never optimistic (lab: `null`, then
-  `false` within about 2 s for a dead server). So "the tunnel is down" is detected for both transports and for both
-  failure kinds: a dead process behind `proxy` (ssh) and an unreachable or blocked server
-  (xray). The probe costs one small HTTP request per 5 s through the tunnel.
+  (7 s when the server refuses at once). These numbers are from a 3 s timeout: a server that drops packets is
+  expected about 1 s later with 4 s (re-measure with stage2), while a refusal fails in 1–2 s, before either timeout.
+  A result stays valid interval × sampling × 2, so 20 s is the worst case. When the pings succeed again it returns to
+  `proxy` within about one interval. Right after xray starts `tunnel.alive` is `null` (no probe yet; lab: `null`,
+  then `false` within about 2 s for a dead server); the balancer itself sends traffic to `proxy` until then (xray
+  counts a subject without results as alive), and a single failure is enough until two results exist. So "the
+  tunnel is down" is detected for both transports and for both failure kinds: a dead process behind `proxy` (ssh)
+  and an unreachable or blocked server (xray). The probe costs one small HTTP request per 5 s through the tunnel,
+  each on a new connection (no keep-alive).
+- One failed probe switches nothing: the tunnel is dead only while its two newest results both failed, and the next
+  success switches back. Each failure is one `[Warning] app/observatory/burst: error ping … with proxy` line (6.8).
+  A probe needs its answer within the timeout over a new connection, so it feels connection setup more than
+  long-lived connections do: 4 s rides out two lost SYNs (retransmits at +1 s and +3 s), which a 3 s timeout did
+  not. Any setting that notices a dead tunnel in about 10 s also switches during about half of all 10 s stalls of
+  the path; timing alone cannot tell them apart.
 - Fallback traffic still passes through xray in userspace; that is acceptable during an outage.
-- DNS follows the same balancer: with the kill switch, tunnelled names do not resolve while the tunnel is down
-  (consistent with blocking them); in fallback mode DoH goes direct, so names keep resolving.
+- DNS follows the same balancer, per connection rather than per query: xray's DoH keeps one HTTP/2 connection to
+  1.1.1.1, which keeps the route it was dialled with until it closes (idle 300 s, or a stalled one after up to
+  45 + 15 s of xray's built-in PING check). With the kill switch, tunnelled names do not resolve while the tunnel is
+  down (consistent with blocking them), except names xray resolved within their TTL plus an hour: those answer from
+  its cache (serveStale, 7.2) while their traffic stays blocked, so nothing leaves the router. In fallback mode DoH
+  goes direct, so names keep resolving.
 - The tunnel check (`check-in`) routes to `proxy` directly, never to the balancer, so it always tests the tunnel.
 
 What xray cannot cover is **xray itself not running** (start, respawn, crash loop, port taken). With no listener the
@@ -464,6 +478,22 @@ counts as `warning`.
 | `warning` (default) | warnings: reconnects, the gate, quick xray exits, a single xray exit ("exited, the previous start was N s ago"), xray not listening 120 s after its start, the nft table restored after a firewall flush, failed checks and lists |
 | `info` | what the user did in LuCI (on, off, Connect, a selection), what a converge (re)starts and why (`converge: xray restarts: its configuration changed (…)`, a Connect, a transport switch, a changed server), every phase change (`phase: connected -> reconnecting (…)`), a teardown, `wan-up` restarts of ssh; xray at `info`: several lines for every connection through it (the LAN device's address, the sniffed name, the route, the dial), its observatory probes, the balancer falling back and failed dials to the server |
 | `debug` | every step: converge start and summary (nft table, dnsmasq, gate), post-start (wait for xray, flushed sets, dnsmasq restart or reload, the check), job start and end with its duration, the gate's inputs, ssh-run's plan (classification, failures, backoff) and launch address, list refreshes. xray stays at `info`: its own `debug` adds far more per connection and would push Shadow's lines out of logd's ring buffer within seconds |
+
+At the default level xray's own warnings and errors show too. The two seen most often:
+
+- `[Warning] app/observatory/burst: error ping http://www.gstatic.com/generate_204 with proxy: … context deadline
+  exceeded (Client.Timeout exceeded while awaiting headers)`: one tunnel probe got no answer within 4 s, a stall of
+  the path, the server or the server's own path to gstatic. One line switches nothing; two in a row switch to the
+  fallback until the next good probe (6.7), and xray logs that switch (`fallback to [block]` / `[direct]`) only at
+  `info`. A probe that ends in `io: read/write on closed pipe` instead was refused at once: the server or the ssh
+  session does not accept connections.
+- `[Error] app/dns: failed to retrieve response for <name> > Post "https://1.1.1.1/dns-query": context deadline
+  exceeded`: one tunnelled DoH lookup got no answer within 4 s, or the background refresh of a stale cached name
+  (7.2) got none within 8 s. For a lookup xray then sends dnsmasq no reply and the device asks again; a refresh
+  leaves the stale answer already given.
+
+Several of each within a few minutes mean the connection to the server stalled for that long. At xray start,
+`health check interval is too small, 10s is applied` means an xray that raises the 5 s probe interval (13).
 
 `info` and `debug` are meant for a session of debugging: with traffic, xray's per-connection lines turn logd's ring
 buffer (`system.@system[0].log_size`) over within minutes, and they name the LAN devices and the sites they reach,
@@ -553,7 +583,10 @@ DoH or DoT forwarder whose traffic full mode tunnels (6.5).
 
 **Tunnel DNS** (`tunnel_dns=1`): names that go to the tunnel are resolved through it: `127.0.0.1#5300` → xray
 `dns-in` → `dns-out` → DoH (`https://1.1.1.1/dns-query`) via the `tunnel` balancer, `queryStrategy: UseIPv4` unless
-`ipv6=1`. This gives the server's geo/CDN answers, avoids ISP poisoning and returns NODATA for AAAA.
+`ipv6=1`. This gives the server's geo/CDN answers, avoids ISP poisoning and returns NODATA for AAAA. xray answers a
+name whose record expired less than an hour ago (`serveStale`, `serveExpiredTTL` = `DNS_STALE_SEC` 3600) at once from
+its cache with TTL 1 and refreshes it in the background, so a stall of the tunnel no longer fails lookups of names in
+use. Stale addresses matter little here: sniffed TLS/HTTP/QUIC is dialled by name on the server (below).
 - Split mode: tunnelled patterns get `server=/P/127.0.0.1#5300`; other names keep the router's normal upstream.
 - Full mode: every name except direct patterns and server hosts goes through the tunnel (6.5), so the ISP sees no
   LAN lookups.
@@ -688,8 +721,9 @@ table inet shadow_vpn {
   "policy": {"levels": {"0": {"handshake": 4, "connIdle": 300, "uplinkOnly": 1, "downlinkOnly": 1, "bufferSize": 4}}},
   "metrics": {"tag": "metrics", "listen": "127.0.0.1:12348"},
   "burstObservatory": {"subjectSelector": ["proxy"],
-    "pingConfig": {"destination": "http://www.gstatic.com/generate_204", "interval": "5s", "sampling": 2, "timeout": "3s"}},
-  "dns": {"tag": "dns-internal", "queryStrategy": "UseIPv4", "servers": ["https://1.1.1.1/dns-query"]},
+    "pingConfig": {"destination": "http://www.gstatic.com/generate_204", "interval": "5s", "sampling": 2, "timeout": "4s"}},
+  "dns": {"tag": "dns-internal", "queryStrategy": "UseIPv4", "serveStale": true, "serveExpiredTTL": 3600,
+    "servers": ["https://1.1.1.1/dns-query"]},
   "inbounds": [
     {"tag": "tproxy-in", "listen": "127.0.0.1", "port": 12345, "protocol": "dokodemo-door",
      "settings": {"network": "tcp,udp", "followRedirect": true},
@@ -722,6 +756,7 @@ table inet shadow_vpn {
 ```
 
 - `fallbackTag` is `direct` when `kill_switch=0`. The UDP→block rule exists only in SSH mode.
+- `serveExpiredTTL` must stay non-zero: with `serveStale` and 0 xray never cleans its DNS cache.
 - `tproxy6-in` on `::1` is rendered only with `ipv6=1`: with `ipv6=0` divert rejects IPv6 before the tproxy rule, and
   binding `::1` would make xray fail on a kernel without IPv6.
 - The private-target rules apply only to sniffed literals; user IP rules that open a network behind the server
@@ -1298,12 +1333,23 @@ shorter than 120 s; and `apk del` recording Shadow as off (11).
 - An IP shared by a tunnelled and a direct name goes to the tunnel in both modes.
 - With `dns_redirect=0`, devices that use their own resolver bypass split routing like browser DoH does.
 - UCI with hundreds of profiles is parsed on every read; the cap is 1000.
-- Detection of a dead tunnel takes 5–16 s, about 8–12 s typical (observatory interval × sampling, lab); in fallback
-  mode a crashed xray opens the gate 10–15 s after the crash (lab). When the server comes back, tunnelled traffic
-  waits for the next successful probe: up to about 8 s after ssh or the server is back (lab).
+- Detection of a dead tunnel takes 5–16 s, about 8–12 s typical (observatory interval × sampling, lab with a 3 s
+  probe timeout; about 1 s more with 4 s for a server that drops packets, 20 s at most); in fallback mode a crashed
+  xray opens the gate 10–15 s after the crash (lab). When the server comes back, tunnelled traffic waits for the next
+  successful probe: up to about 8 s after ssh or the server is back (lab).
+- A stall of the path to the server of about 4 s or more can switch tunnelled traffic to block or direct until the
+  next good probe, a few seconds later; the log shows each failed probe but not the switch (6.8). Field log
+  2026-10-28: 33 failed probes in 4.7 h, in four bad periods, about 5–6 switches.
+- The 5 s probe interval relies on xray before 26.6.1, which never applies its own 10 s minimum (it compares with
+  10 ns). From 26.6.1 on (upstream PR #6106) the interval becomes 10 s and detection about 20 s: xray logs `health
+  check interval is too small, 10s is applied` at start, and `tests/unit/runtime/cases/xray.uc` fails on such an
+  image until the values are chosen again.
+- A tunnelled DoH connection that stalls silently keeps failing lookups of names outside xray's stale cache for up
+  to about 60 s (xray's built-in HTTP/2 PING check, 45 + 15 s, not set from the JSON).
 - Fallback mode while xray runs but the server is gone: tunnelled names resolve through xray's DoH, which then goes
   out directly from the router to 1.1.1.1 (lab). Where 1.1.1.1 is blocked, they do not resolve until the tunnel is
-  back; the switch to the normal upstream happens only while xray itself is down (6.7).
+  back; the switch to the normal upstream happens only while xray itself is down (6.7). A DoH connection opened
+  then stays direct after the tunnel is back, until it has been idle 300 s.
 - An SSH session shorter than 120 s does not reset the backoff (desktop parity), so a server that flaps reconnects
   after up to 60 s; `ifup wan` (or any WAN up event) reconnects at once.
 - Routing is decided per packet (7.2): an established direct TCP flow whose address joins a tunnel set is reset
@@ -1500,3 +1546,12 @@ Changes from the README's quick-start check (2026-10-26):
 | Finding | Change |
 |---|---|
 | a setup with only Xray links could not turn on: a fresh install starts on SSH, the import selected the first profile without touching the transport (so the Xray tab showed it as selected, with no Select button), and Turn on refused with "Select or create an SSH configuration before connecting." until the user found the Transport switch on the Overview | while Shadow is off, the first server or supported profile becomes the transport when the current one has nothing usable selected (10) |
+
+Changes from a field log (2026-10-28: 33 failed tunnel probes and 12 DoH timeouts in 4.7 h, xray never restarted):
+
+| Finding | Change |
+|---|---|
+| every failed probe was a stall, not a refusal, and the close pairs switched the kill switch on a working tunnel for a few seconds each; the 3 s probe timeout ended exactly at the second SYN retransmit of a probe's new connection | probe timeout 3 → 4 s: a server that drops packets is noticed about 1 s later, a refusing one as before, 20 s worst case unchanged (6.7, 13) |
+| each DoH timeout left a LAN device with no reply, also for names in use: xray's cache expired together with dnsmasq's (TTL capped at 300 s) | xray DNS `serveStale` with `serveExpiredTTL` 3600 (`DNS_STALE_SEC`): names whose record expired less than an hour ago answer at once (TTL 1) and refresh in the background (6.7, 7.2) |
+| the 5 s probe interval works only because xray 26.3.x never applies its own 10 s minimum; 26.6.1+ does | `tests/unit/runtime/cases/xray.uc` requires an xray before 26.6.1 (13) |
+| DESIGN said DNS follows the balancer and the balancer is never optimistic; both hold per connection and per result only, and the two xray lines users see were not explained | 6.7 and 6.8 say how routing, the switch and the log lines really behave |

@@ -7,10 +7,15 @@ export const NFT_TABLE = 'shadow_vpn';
 export const MARK_TPROXY = 0x00400000, MARK_XRAY = 0x00800000, RT_TABLE = 106, RT_PRIO = 106;
 export const PORT_TPROXY = 12345, PORT_DNS = 5300, PORT_SSH = 12346, PORT_CHECK = 12347, PORT_METRICS = 12348;
 
-// Two failed probes in a row mark the tunnel dead. xray spreads `sampling` probes at random over
-// interval x sampling, so a drop is noticed in about 10 s (7 s when the server refuses at once),
-// 23 s at worst. Keep DESIGN.md 6.7 and 14 in sync when tuning.
-export const OBSERVATORY = { destination: 'http://www.gstatic.com/generate_204', interval: '5s', sampling: 2, timeout: '3s' };
+// Two failed probes in a row mark the tunnel dead; one failure switches nothing, the next success switches back.
+// xray starts `sampling` probes at random moments in every interval x sampling window, so a dead server is noticed
+// in about 12 s (7 s when it refuses at once, which fails before the timeout), 20 s at worst (a result stays valid
+// 2 x interval x sampling). Every probe is a new connection through the tunnel: timeout 4s rides out two lost SYNs
+// (+1 s, +3 s), and costs a server that drops packets about 1 s of detection over 3s.
+// interval 5s works only because xray before 26.6.1 never applies its own 10 s minimum (healthping.go compares
+// with 10 ns); later xray raises it to 10 s, about 20 s detection, and the xray.uc unit test fails.
+// Keep DESIGN.md 6.7, 7.4, 13 and CONTRACTS.md 2 in sync when tuning.
+export const OBSERVATORY = { destination: 'http://www.gstatic.com/generate_204', interval: '5s', sampling: 2, timeout: '4s' };
 export const XRAY_DOWN_FALLBACK_SEC = 10;   // fallback mode: gate=accept after xray has been down this long
 
 export const LIST_URLS = {
@@ -55,6 +60,9 @@ export const LOG_TAG = 'shadow-vpn';
 export const XRAY_BIN = '/usr/bin/xray';
 export const XRAY_ENV = { GOGC: '50', GOMEMLIMIT: '48MiB' };
 export const DOH_SERVER = 'https://1.1.1.1/dns-query';
+// xray answers a name whose record expired at most this long ago from its cache at once (TTL 1) and refreshes it
+// in the background (serveStale, DESIGN.md 7.2). Never 0: with 0 xray never cleans its DNS cache.
+export const DNS_STALE_SEC = 3600;
 export const CHECK_TIMEOUT_MS = 12000;
 export const CHECK_ENDPOINT = 'youtube.com:443';
 

@@ -65,6 +65,14 @@ eq('xray/ssh: proxy is the local ssh -D socks', by_tag(c.outbounds, 'proxy'),
 eq('xray/ssh: balancer falls back to block', c.routing.balancers,
 	[ { tag: 'tunnel', selector: [ 'proxy' ], fallbackTag: 'block', strategy: { type: 'random' } } ]);
 eq('xray/ssh: observatory from const', c.burstObservatory, { subjectSelector: [ 'proxy' ], pingConfig: OBSERVATORY });
+
+// xray 26.6.1 and later raise a burstObservatory interval under 10 s to 10 s (healthping.go `< 10*time.Second`),
+// which doubles detection with OBSERVATORY's 5 s (DESIGN.md 13). Its warning about that is logged asynchronously
+// and `xray run -test` usually exits before printing it, so the image's xray version is checked instead.
+let xv = match(run('xray version').out, /Xray ([0-9]+)\.([0-9]+)\.([0-9]+)/);
+
+ok('xray: OBSERVATORY assumes an xray before 26.6.1, which keeps the 5 s interval (DESIGN.md 13)',
+	xv != null && int(xv[1]) * 1000000 + int(xv[2]) * 1000 + int(xv[3]) < 26006001, xv?.[0]);
 eq('xray/ssh: metrics on 12348', c.metrics, { tag: 'metrics', listen: '127.0.0.1:12348' });
 eq('xray/ssh: only the v4 tproxy inbound with ipv6=0', map(c.inbounds, (i) => i.tag), [ 'tproxy-in', 'dns-in', 'check-in' ]);
 eq('xray/ssh: tproxy inbound', by_tag(c.inbounds, 'tproxy-in'), {
@@ -76,7 +84,8 @@ eq('xray/ssh: tproxy inbound', by_tag(c.inbounds, 'tproxy-in'), {
 eq('xray/ssh: check-in socks without udp', by_tag(c.inbounds, 'check-in').settings.udp, false);
 eq('xray/ssh: direct is marked', by_tag(c.outbounds, 'direct').streamSettings.sockopt.mark, MARK_XRAY);
 eq('xray/ssh: dns-out rejects non-IP queries', by_tag(c.outbounds, 'dns-out').settings, { nonIPQuery: 'reject' });
-eq('xray/ssh: DoH, IPv4 answers only', c.dns, { tag: 'dns-internal', queryStrategy: 'UseIPv4', servers: [ 'https://1.1.1.1/dns-query' ] });
+eq('xray/ssh: DoH, IPv4 answers only, stale answers for an hour', c.dns,
+	{ tag: 'dns-internal', queryStrategy: 'UseIPv4', serveStale: true, serveExpiredTTL: 3600, servers: [ 'https://1.1.1.1/dns-query' ] });
 eq('xray/ssh: idle connections live 300 s', c.policy.levels['0'].connIdle, 300);
 eq('xray/ssh: log', c.log, { loglevel: 'warning', access: 'none', dnsLog: false });
 
@@ -119,6 +128,8 @@ eq('xray/xray: balancer falls back to direct', c.routing.balancers[0].fallbackTa
 eq('xray/xray: both tproxy inbounds with ipv6=1', map(c.inbounds, (i) => [ i.tag, i.listen ]),
 	[ [ 'tproxy-in', '127.0.0.1' ], [ 'tproxy6-in', '::1' ], [ 'dns-in', '127.0.0.1' ], [ 'check-in', '127.0.0.1' ] ]);
 eq('xray/xray: DoH answers both families', c.dns.queryStrategy, 'UseIP');
+ok('xray/xray: the stale DNS cache stays bounded (serveExpiredTTL 0 never cleans it)',
+	c.dns.serveStale === true && c.dns.serveExpiredTTL > 0);
 eq('xray/xray: log level follows log_level', c.log.loglevel, 'error');
 eq('xray/xray: Shadow debug keeps xray at info (its debug logs every connection)',
 	render(model({ transport: 'xray', log_level: 'debug' }, user_rules), { outbound: OUTBOUND, vision: true }).config?.log?.loglevel,

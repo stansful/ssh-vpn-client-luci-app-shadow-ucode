@@ -1,7 +1,8 @@
 'use strict';
 
 import {
-	MARK_XRAY, PORT_TPROXY, PORT_DNS, PORT_SSH, PORT_CHECK, PORT_METRICS, OBSERVATORY, PRIVATE_NETS, DOH_SERVER
+	MARK_XRAY, PORT_TPROXY, PORT_DNS, PORT_SSH, PORT_CHECK, PORT_METRICS, OBSERVATORY, PRIVATE_NETS, DOH_SERVER,
+	DNS_STALE_SEC
 } from 'shadow-vpn.const';
 
 // Shadow's debug keeps xray at info: info already logs several lines per connection (the device's address,
@@ -149,7 +150,9 @@ function render(model, ctx) {
 		policy: { levels: { '0': { handshake: 4, connIdle: 300, uplinkOnly: 1, downlinkOnly: 1, bufferSize: 4 } } },
 		metrics: { tag: 'metrics', listen: `127.0.0.1:${PORT_METRICS}` },
 		burstObservatory: { subjectSelector: [ 'proxy' ], pingConfig: { ...OBSERVATORY } },
-		dns: { tag: 'dns-internal', queryStrategy: m.ipv6 ? 'UseIP' : 'UseIPv4', servers: [ DOH_SERVER ] },
+		// a short stall of the tunnel no longer fails lookups of names in use: their expired records answer at once
+		dns: { tag: 'dns-internal', queryStrategy: m.ipv6 ? 'UseIP' : 'UseIPv4', serveStale: true,
+			serveExpiredTTL: DNS_STALE_SEC, servers: [ DOH_SERVER ] },
 		inbounds,
 		outbounds: [
 			proxy.outbound,

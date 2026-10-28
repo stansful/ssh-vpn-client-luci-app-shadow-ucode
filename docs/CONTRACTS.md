@@ -57,7 +57,7 @@ export const LIBEXEC = '/usr/libexec/shadow-vpn';
 export const NFT_TABLE = 'shadow_vpn';
 export const MARK_TPROXY = 0x00400000, MARK_XRAY = 0x00800000, RT_TABLE = 106, RT_PRIO = 106;
 export const PORT_TPROXY = 12345, PORT_DNS = 5300, PORT_SSH = 12346, PORT_CHECK = 12347, PORT_METRICS = 12348;
-export const OBSERVATORY = { destination: 'http://www.gstatic.com/generate_204', interval: '5s', sampling: 2, timeout: '3s' };
+export const OBSERVATORY = { destination: 'http://www.gstatic.com/generate_204', interval: '5s', sampling: 2, timeout: '4s' };
 export const XRAY_DOWN_FALLBACK_SEC = 10;   // fallback mode: gate=accept after xray has been down this long
 export const LIST_URLS = {
 	proxy: 'https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-raw.lst',
@@ -101,7 +101,11 @@ subject `proxy`), `UCI` with `main.enabled`, and `/etc/init.d/shadow-vpn` as a p
 (tests/unit/runtime/cases/update.uc `update/compat`).
 
 Detection target (owner, 2026-10-25): a dead tunnel is noticed in about 10 s. The observatory values above are the
-starting point; tune them in the lab and keep this file and DESIGN.md §6.7 in sync.
+starting point; tune them in the lab and keep this file and DESIGN.md §6.7 in sync. Tuned 2026-10-28 from a field
+log: timeout 3s → 4s, so a server that drops packets is noticed about 1 s later (about 12 s typical, 20 s at most;
+re-measure), a refusing one as before. The 5 s interval relies on xray before 26.6.1, which does not apply its own
+10 s minimum (DESIGN.md §13); `tests/unit/runtime/cases/xray.uc` fails on a newer xray. Detection in about 10 s
+cannot be told apart from a 10 s stall by timing alone (DESIGN.md §6.7).
 
 ## 3. Data model (`config.uc`)
 

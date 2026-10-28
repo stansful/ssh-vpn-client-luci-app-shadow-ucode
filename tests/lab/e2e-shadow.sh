@@ -860,7 +860,9 @@ stage2_killswitch_xray() {
 		nok "kill switch xray: the tunnel resumes on its own" "$(probe_http tunnel.shadow.lab) $(rpc status | jq -c .tunnel)"
 	fi
 	poll 30 alive_is true && ok "kill switch xray: tunnel.alive true again" || nok "kill switch xray: tunnel.alive true again" "$(rpc status | jq -c .tunnel)"
-	if poll 20 public_name_resolves; then ok "kill switch xray: tunnel DNS answers again"; else nok "kill switch xray: tunnel DNS answers again" "$(C "dig +time=3 +tries=1 $PUBLIC_NAME A")"; fi
+	# a fresh name: example.com would answer from xray's stale cache (serveStale) without a DoH round trip
+	name="$(fresh_name back)"
+	if poll 20 answers "$name"; then ok "kill switch xray: tunnel DNS answers again"; else nok "kill switch xray: tunnel DNS answers again" "$(C "dig +time=3 +tries=1 $name A")"; fi
 }
 
 stage2_fallback_xray() {

@@ -104,6 +104,11 @@ profiles you keep and delete the rest with one button.
 Shadow, Xray and SSH events in one place: filter by level or text, download, clear, follow. For debugging, set
 Settings → Logs → Detail to Debug, and back to Warnings and errors when you are done.
 
+A line `app/observatory/burst: error ping … with proxy` is one tunnel probe that got no answer in time; one alone
+changes nothing, as Shadow treats the tunnel as down only after two failed probes in a row. Several within a few
+minutes, often with `app/dns: failed to retrieve response`, mean the connection to the server stalled for a while:
+the network on the way, the server, or a fully loaded router.
+
 ![The Logs tab](docs/images/en/log.png)
 
 ## Update

@@ -548,7 +548,11 @@ stage1_ssh_full() {
 	gen="$(applied_gen)"
 	if direct_list on; then ok "ssh full: direct list fixture on"; else nok "ssh full: direct list fixture on" "store or list_set failed"; fi
 	wait_up "$gen" "ssh full + direct list"
-	check "ssh full: a direct-list name stays direct" "$DIRECT_SRC" "$(curl_c http://direct.shadow.lab/)"
+	# the tunnel stays alive over this converge, so wait_up returns before post-start has restarted dnsmasq
+	# with the direct names: a lookup meanwhile fails at once (curl prints nothing) and fills no set
+	poll 30 settled
+	if poll 15 goes_direct direct.shadow.lab; then ok "ssh full: a direct-list name stays direct"
+	else nok "ssh full: a direct-list name stays direct" "want '$DIRECT_SRC', got '$(probe_http direct.shadow.lab)'"; fi
 	check "ssh full: other names still go through the tunnel" "$TUNNEL_SRC" "$(curl_c http://tunnel.shadow.lab/)"
 	check "ssh full: the direct set is filled" "203.0.113.10" "$(R 'nft list set inet shadow_vpn direct4')"
 	gen="$(applied_gen)"
